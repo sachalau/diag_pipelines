@@ -80,10 +80,10 @@ jobs:
       - run:
           name: Create human genome MASH sketch
           command: |
-             source activate ${conda_folder}/envs/618592fe/ 
+             source activate ${conda_folder}/envs/206eba9c/
              efetch -db assembly -id 1493941 -format docsum | xtract -pattern DocumentSummary -element FtpPath_RefSeq | sed "s/\(\/GCF_.*\)/\\1\\1_genomic.fna.gz/" | xargs -I % wget -qO- % | gzip -d > ${data_folder}/references/1493941/genome_fasta.fasta
              source deactivate
-             source activate ${conda_folder}/envs/c327f08f/
+             source activate ${conda_folder}/envs/64d9220c/
              mash sketch -o ${data_folder}/references/mash_sketch_human.msh ${data_folder}/references/1493941/genome_fasta.fasta
              source deactivate
              rm -rf ${data_folder}/references/1493941/
