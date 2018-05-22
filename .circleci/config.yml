@@ -73,7 +73,7 @@ jobs:
              chmod -R 777 ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/
       - save_cache:
           key: v1-{{ checksum "all_env.yaml" }}	     	   
-
+          paths: my-cache.txt
 
   create_all_refs:
     docker:
