@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  download_envs:
+  build:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -127,13 +127,11 @@ jobs:
              rgi_load -i card.json
              source deactivate
 
-
-
 workflows:
   version: 2
   download_and_refs:
     jobs:
-      - download_all_envs
+      - build
       - create_all_refs:
         requires:
-          - download_all_envs
+          - build
