@@ -128,7 +128,6 @@ jobs:
              source activate ${conda_folder}/e7260ed8/
              rgi_load -i card.json
              source deactivate
-
 workflows:
   version: 2
   download_and_refs:
