@@ -40,7 +40,7 @@ jobs:
       - run:
           name: Download MASH sketchs
           command: |
-	     mkdir -p ${data_folder}/references/
+             mkdir -p ${data_folder}/references/
              wget -qO- https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh > $data_folder/references/mash_sketch.msh
       - run:
           name: Download all conda environments
