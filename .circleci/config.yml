@@ -47,7 +47,7 @@ jobs:
              mkdir -p core_genomes/parsnp/Mycobacterium_tuberculosis/
              mkdir -p core_genomes/cgMLST/
              mkdir -p references/538048/
-             mkdir -p virulence_factors_db/Mycobacterium_tuberculosis/
+             mkdir -p virulence_factors_db/Staphylococcus_aureus/
              echo '' > links/Myco-10_S10_L001_R1.fastq.gz 
              echo '' > links/Myco-10_S10_L001_R2.fastq.gz
              echo '' > core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa
