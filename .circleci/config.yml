@@ -15,8 +15,8 @@ jobs:
           command: |
              cat ${pipeline_folder}/envs/*.yaml > all_envs.yaml
       - restore_cache:
-        keys:
-          - v1-{{ checksum "all_env.yaml" }}
+          keys:
+            - v1-{{ checksum "all_env.yaml" }}
       - run:
           name: Add chanels to conda
           command: |
