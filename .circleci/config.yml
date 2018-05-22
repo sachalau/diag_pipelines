@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  donwload_envs:
+  download_envs:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -76,6 +76,12 @@ jobs:
 
 
   create_all_refs:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: diag_pipelines/
+          data_folder: data/
+          conda_folder: /opt/conda/  
     steps:
       - run: 
           name: Create BED cgMLST files
