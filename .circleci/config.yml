@@ -91,7 +91,7 @@ jobs:
       - run:
           name: Patch mykrobe file
           command: |
-             patch /opt/conda/envs/5142c1b8/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
+             patch /opt/conda/5142c1b8/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
       - run:
           name: Download and load RGI data
           command: |
