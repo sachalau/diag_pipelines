@@ -1,4 +1,5 @@
 version: 2
+
 jobs:
   build:
     docker:
@@ -10,6 +11,12 @@ jobs:
     steps:
       - checkout:
           path: $pipeline_folder
+      - run:
+          name: Create env file
+          command: |
+             cat ${pipeline_folder}/envs/*.yaml > all_envs.yaml
+      - restore_cache:
+          key: v1-{{ checksum "all_envs.yaml" }}
       - run:
           name: Add chanels to conda
           command: |
@@ -29,11 +36,59 @@ jobs:
              tar xf parsnp.tar.gz
              mv Parsnp-Linux64-v1.2/parsnp /usr/local/bin/parsnp
              rm -rf Parsnp-Linux64-v1.2/
-             rm parsnp.tar.gz 
+             rm parsnp.tar.gz
+      - run:
+          name: Download all conda environments
+          command: |
+             mkdir -p tmp/links
+             cd tmp
+             cp ../${pipeline_folder}/*.tsv .
+             cp ../${pipeline_folder}/config.yaml .
+             mkdir -p core_genomes/parsnp/Mycobacterium_tuberculosis/
+             mkdir -p core_genomes/cgMLST/
+             mkdir -p references/538048/
+             mkdir -p virulence_factors_db/Staphylococcus_aureus/
+             echo '' > links/Myco-10_S10_L001_R1.fastq.gz 
+             echo '' > links/Myco-10_S10_L001_R2.fastq.gz
+             echo '' > core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa
+             echo '' > core_genomes/cgMLST/Mycobacterium_tuberculosis.bed
+             echo '' > references/mash_sketch.msh
+             echo '' > references/mash_sketch_human.msh
+             echo '' > references/538048/genome_fasta.fasta
+             echo '' > virulence_factors_db/Staphylococcus_aureus/virulence_factors.tsv
+             snakemake --snakefile ../${pipeline_folder}/workflows/full_pipeline.rules --use-conda --create-envs-only --conda-prefix ${conda_folder} --configfile config.yaml quality/multiqc/assembly/multiqc_report.html samples/M10/resistance/mykrobe.tsv typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/core_parsnp_538048/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/full_genome_M10_assembled_genome/bwa/distances_in_snp_mst_no_st.svg virulence_summary.xlsx typing/mlst/summary.xlsx resistance/rgi_summary.xlsx resistance/mykrobe_summary.xlsx phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/full_genome_538048/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/core_parsnp_538048/bwa/phylogeny_no_st.svg contamination/distances_formated.xlsx -j 4 --config species="Mycobacterium_tuberculosis"
+             conda clean --all -y
+             cd ..
+             rm -rf tmp
+      - run:
+          name: Download MASH sketchs
+          command: |
+             mkdir -p ${data_folder}/references/
+             wget -qO- https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh > $data_folder/references/mash_sketch.msh
+      - run:
+          name: Patch mykrobe file
+          command: |
+             patch ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
+      - run:
+          name: Change rights RGI and Mykrobe folders
+          command: |	     
+             chmod -R 777 ${conda_folder}/e7260ed8/lib/python2.7/site-packages/package/rgi/_db/
+             chmod -R 777 ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/
+      - save_cache:
+          key: v1-{{ checksum "all_envs.yaml" }}	     	   
+          paths: my-cache.txt
+
+  create_all_refs:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: diag_pipelines/
+          data_folder: data/
+          conda_folder: /opt/conda/  
+    steps:
       - run: 
           name: Create BED cgMLST files
           command: |
-             mkdir $data_folder 
              cd $data_folder
              snakemake --snakefile ../${pipeline_folder}/workflows/core_genomes/make_ridom.rules --use-conda --conda-prefix ${conda_folder} core_genomes/cgMLST/Staphylococcus_aureus.bed core_genomes/cgMLST/Mycobacterium_tuberculosis.bed core_genomes/cgMLST/Listeria_monocytogenes.bed core_genomes/cgMLST/Klebsiella_pneumoniae.bed core_genomes/cgMLST/Enterococcus_faecium.bed core_genomes/cgMLST/Acinetobacter_baumannii.bed core_genomes/cgMLST/Legionella_pneumophila.bed core_genomes/cgMLST/Clostridioides_difficile.bed -j 2 
              snakemake --snakefile ../${pipeline_folder}/workflows/core_genomes/make_enterobase.rules --use-conda --conda-prefix ${conda_folder} core_genomes/cgMLST/Salmonella_enterica.bed core_genomes/cgMLST/Escherichia_coli.bed references/538048/genome_gbwithparts.gbwithparts
@@ -55,29 +110,6 @@ jobs:
              mkdir -p ${data_folder}/virulence_factors_db/Staphylococcus_aureus/
              cp ${pipeline_folder}/data/staph/db/virulence_factors.tsv ${data_folder}/virulence_factors_db/Staphylococcus_aureus/
       - run:
-          name: Download MASH sketchs
-          command: |
-             wget -qO- https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh > $data_folder/references/mash_sketch.msh
-      - run:
-          name: Download all conda environments
-          command: |
-             mkdir -p tmp/links
-             cd tmp
-             cp ../${pipeline_folder}/*.tsv .
-             cp ../${pipeline_folder}/config.yaml .
-             mkdir -p core_genomes/parsnp/Mycobacterium_tuberculosis/
-             echo '' > links/Myco-10_S10_L001_R1.fastq.gz 
-             echo '' > links/Myco-10_S10_L001_R2.fastq.gz
-             echo '' > core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa
-             echo '' > ../${data_folder}/references/mash_sketch_human.msh
-             ln -s -r ../${data_folder}/references/ references
-             ln -s -r ../${data_folder}/core_genomes/cgMLST/ core_genomes/cgMLST
-             ln -s -r ../${data_folder}/virulence_factors_db/ virulence_factors_db
-             snakemake --snakefile ../${pipeline_folder}/workflows/full_pipeline.rules --use-conda --create-envs-only --conda-prefix ${conda_folder} --configfile config.yaml quality/multiqc/assembly/multiqc_report.html samples/M10/resistance/mykrobe.tsv typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/core_parsnp_538048/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/full_genome_M10_assembled_genome/bwa/distances_in_snp_mst_no_st.svg virulence_summary.xlsx typing/mlst/summary.xlsx resistance/rgi_summary.xlsx resistance/mykrobe_summary.xlsx phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/full_genome_538048/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/core_parsnp_538048/bwa/phylogeny_no_st.svg contamination/distances_formated.xlsx -j 4 --config species="Mycobacterium_tuberculosis"
-             conda clean --all -y
-             cd ..
-             rm -rf tmp
-      - run:
           name: Create human genome MASH sketch
           command: |
              source activate ${conda_folder}/206eba9c/
@@ -89,15 +121,11 @@ jobs:
              source deactivate
              rm -rf ${data_folder}/references/1493941/
       - run:
-          name: Patch mykrobe file
-          command: |
-             patch /opt/conda/5142c1b8/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
-      - run:
           name: Download and load RGI data
           command: |
              wget https://card.mcmaster.ca/download/0/broadstreet-v1.1.9.tar.bz2 --no-check-certificate
              tar xf broadstreet-v1.1.9.tar.bz2
-             source activate /opt/conda/e7260ed8/
+             source activate ${conda_folder}/e7260ed8/
              rgi_load -i card.json
              source deactivate
       - run:
@@ -106,21 +134,11 @@ jobs:
              chmod -R 777 /opt/conda/e7260ed8/lib/python2.7/site-packages/package/rgi/_db/
              chmod -R 777 /opt/conda/5142c1b8/lib/python3.6/site-packages/mykatlas/
 
-
-  test_MTB_resistance:
-    docker:
-      - image: continuumio/miniconda3:4.3.27
-        environment:
-          pipeline_folder: diag_pipelines/
-          data_folder: data/
-          conda_folder: /opt/conda/
-
-
-worklows:
+workflows:
   version: 2
-  build_accept_deploy:
+  download_and_refs:
     jobs:
       - build
-      - test_MTB_resistance:
+      - create_all_refs:
         requires:
-	  - build
+          - build
