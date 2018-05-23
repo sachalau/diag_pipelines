@@ -71,11 +71,11 @@ jobs:
              patch ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
       - run:
           name: Change rights RGI and Mykrobe folders
-          command: |	     
+          command: |     
              chmod -R 777 ${conda_folder}/e7260ed8/lib/python2.7/site-packages/package/rgi/_db/
              chmod -R 777 ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/
       - save_cache:
-          key: v1-{{ checksum "all_envs.yaml" }}	     	   
+          key: v1-{{ checksum "all_envs.yaml" }}   
           paths: my-cache.txt
 
   create_all_refs:
@@ -130,7 +130,7 @@ jobs:
              source deactivate
       - run:
           name: Change rights RGI and Mykrobe folders
-          command: |	     
+          command: |     
              chmod -R 777 /opt/conda/e7260ed8/lib/python2.7/site-packages/package/rgi/_db/
              chmod -R 777 /opt/conda/5142c1b8/lib/python3.6/site-packages/mykatlas/
 
