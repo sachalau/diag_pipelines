@@ -105,3 +105,22 @@ jobs:
           command: |	     
              chmod -R 777 /opt/conda/e7260ed8/lib/python2.7/site-packages/package/rgi/_db/
              chmod -R 777 /opt/conda/5142c1b8/lib/python3.6/site-packages/mykatlas/
+
+
+  test_MTB_resistance:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: diag_pipelines/
+          data_folder: data/
+          conda_folder: /opt/conda/
+
+
+worklows:
+  version: 2
+  build_accept_deploy:
+    jobs:
+      - build
+      - test_MTB_resistance:
+        requires:
+	  - build
