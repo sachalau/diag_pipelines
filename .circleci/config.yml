@@ -5,13 +5,13 @@ jobs:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
-          pipeline_folder: /opt/diag_pipelines/
+          pipeline_folder: /home/pipeline_user/src/
           data_folder: /home/pipeline_user/data/
-          conda_folder: /opt/conda/
+          conda_folder: /home/pipeline_user/conda/
     working_directory:  /home/pipeline_user/
     steps:
       - checkout:
-          path: ../../$pipeline_folder
+          path: src/
       - run:
           name: Create env file
           command: |
@@ -30,14 +30,6 @@ jobs:
       - run:
           name: Install snakemake with conda
           command: conda install snakemake=4.8.0=py36_0
-      - run:
-          name: Download ParSNP bin
-          command: |
-             wget -qO- https://github.com/marbl/parsnp/releases/download/v1.2/parsnp-Linux64-v1.2.tar.gz > parsnp.tar.gz
-             tar xf parsnp.tar.gz
-             mv Parsnp-Linux64-v1.2/parsnp /usr/local/bin/parsnp
-             rm -rf Parsnp-Linux64-v1.2/
-             rm parsnp.tar.gz
       - run:
           name: Download all conda environments
           command: |
@@ -76,16 +68,15 @@ jobs:
       - persist_to_workspace:
           root: /home/pipeline_user/
           paths:
-            - ../../opt/conda/
-            - ../../usr/local/bin/
+            - conda/
 
   create_all_refs:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
-          pipeline_folder: /opt/diag_pipelines/
+          pipeline_folder: /home/pipeline_user/src/
           data_folder: /home/pipeline_user/data/
-          conda_folder: /opt/conda/
+          conda_folder: /home/pipeline_user/conda/
     working_directory:  /home/pipeline_user/
     steps:
       - checkout:
