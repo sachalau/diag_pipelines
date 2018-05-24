@@ -15,8 +15,6 @@ jobs:
           name: Create env file
           command: |
              cat ${pipeline_folder}/envs/*.yaml > all_envs.yaml
-      - restore_cache:
-          key: v1-{{ checksum "all_envs.yaml" }}
       - run:
           name: Add chanels to conda
           command: |
@@ -86,6 +84,8 @@ jobs:
           data_folder: data/
           conda_folder: /opt/conda/  
     steps:
+      - restore_cache:
+          key: v1-{{ checksum "all_envs.yaml" }}
       - run: 
           name: Create BED cgMLST files
           command: |
@@ -144,6 +144,10 @@ jobs:
           pipeline_folder: diag_pipelines/
           data_folder: data/
           conda_folder: /opt/conda/
+     steps:
+      - restore_cache:
+          key: v1-{{ .Branch }}-{{ .Revision }}
+        
 
 workflows:
   version: 2
