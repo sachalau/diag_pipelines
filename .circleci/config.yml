@@ -16,6 +16,8 @@ jobs:
           name: Create env file
           command: |
              cat ${pipeline_folder}/envs/*.yml > all_envs.yml
+      - restore_cache:
+          key: v1-{{ checksum "all_envs.yml" }}
       - run:
           name: Add chanels to conda
           command: |
@@ -71,6 +73,11 @@ jobs:
       - save_cache:
           key: v1-{{ checksum "all_envs.yml" }}   
           paths: cache_downloads.txt
+      - persist_to_workspace:
+          root: /home/pipeline_user/
+          paths:
+            - ../../opt/conda/
+            - ../../usr/local/bin/
 
   create_all_refs:
     docker:
@@ -83,12 +90,20 @@ jobs:
     steps:
       - checkout:
           path: ../../$pipeline_folder
+      - attach_workspace:
+          at: /home/pipeline_user/
       - run:
-          name: Create env file
+          name: Add chanels to conda
           command: |
-             cat ${pipeline_folder}/envs/*.yml > all_envs.yml
-      - restore_cache:
-          key: v1-{{ checksum "all_envs.yml" }}
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install fonts and unzip
+          command: apt-get install -y fontconfig unzip
+      - run:
+          name: Install snakemake with conda
+          command: conda install snakemake=4.8.0=py36_0
       - run:
           name: Download MASH sketchs
           command: |
@@ -194,8 +209,10 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - create_all_refs
       - build
+      - create_all_refs:
+          requires:
+            - build
       - test_MTB_resistance:
           requires:
             - create_all_refs
