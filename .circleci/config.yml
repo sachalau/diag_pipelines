@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  build:
+  build2:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -67,7 +67,7 @@ jobs:
           paths:
             - conda/
 
-  create_all_refs:
+  build:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -189,7 +189,7 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - create_all_refs
+      - build
       - test_MTB_resistance
           requires:
-            - create_all_refs 
+            - build
