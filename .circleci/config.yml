@@ -25,9 +25,6 @@ jobs:
              conda config --add channels conda-forge
              conda config --add channels bioconda
       - run:
-          name: Install fonts and unzip
-          command: apt-get install -y fontconfig unzip
-      - run:
           name: Install snakemake with conda
           command: conda install snakemake=4.8.0=py36_0
       - run:
@@ -56,12 +53,12 @@ jobs:
       - run:
           name: Patch mykrobe file
           command: |
-             patch ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
+             patch ${conda_folder}/*/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
       - run:
           name: Change rights RGI and Mykrobe folders
           command: |     
-             chmod -R 777 ${conda_folder}/e7260ed8/lib/python2.7/site-packages/package/rgi/_db/
-             chmod -R 777 ${conda_folder}/5142c1b8/lib/python3.6/site-packages/mykatlas/
+             chmod -R 777 ${conda_folder}/*/lib/python2.7/site-packages/package/rgi/_db/
+             chmod -R 777 ${conda_folder}/*/lib/python3.6/site-packages/mykatlas/
       - save_cache:
           key: v1-{{ checksum "all_envs.yml" }}   
           paths: cache_downloads.txt
@@ -69,7 +66,6 @@ jobs:
           root: /home/pipeline_user/
           paths:
             - conda/
-
   create_all_refs:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -79,10 +75,10 @@ jobs:
           conda_folder: /home/pipeline_user/conda/
     working_directory:  /home/pipeline_user/
     steps:
-      - checkout:
-          path: src/
       - attach_workspace:
           at: /home/pipeline_user/
+      - checkout:
+          path: src/
       - run:
           name: Add chanels to conda
           command: |
