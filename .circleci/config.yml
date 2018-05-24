@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  build2:
+  deploy_test:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -190,6 +190,4 @@ workflows:
   build_and_test:
     jobs:
       - build
-      - test_MTB_resistance
-          requires:
-            - build
+
