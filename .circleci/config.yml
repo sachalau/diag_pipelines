@@ -11,7 +11,7 @@ jobs:
     working_directory:  /home/pipeline_user/
     steps:
       - checkout:
-          path: $pipeline_folder
+          path: ../../$pipeline_folder
       - run:
           name: Create env file
           command: |
