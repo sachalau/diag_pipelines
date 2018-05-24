@@ -80,7 +80,7 @@ jobs:
     working_directory:  /home/pipeline_user/
     steps:
       - checkout:
-          path: ../../$pipeline_folder
+          path: src/
       - attach_workspace:
           at: /home/pipeline_user/
       - run:
