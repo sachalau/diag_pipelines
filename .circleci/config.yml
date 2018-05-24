@@ -144,7 +144,7 @@ jobs:
           pipeline_folder: diag_pipelines/
           data_folder: data/
           conda_folder: /opt/conda/
-     steps:
+    steps:
       - restore_cache:
           key: v1-{{ .Branch }}-{{ .Revision }}
       - run:
