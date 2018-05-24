@@ -147,7 +147,7 @@ jobs:
 
 workflows:
   version: 2
-  download_and_refs:
+  build_and_test:
     jobs:
       - build
       - create_all_refs:
