@@ -25,7 +25,7 @@ if "--dryrun" not in sys.argv and "-n" not in sys.argv:
     with open(cmd_file, "w") as f:
         f.write(" ".join(sys.argv)+"\n")
     if workflow.overwrite_configfile is not None:
-        copyfile(workflow.overwrite_configfile, logging_folder+"/config.yaml")
+        copyfile(workflow.overwrite_configfile, logging_folder+"/config.yml")
     if "local_samples" in config.keys():
         copyfile(config["local_samples"], logging_folder+"/local_samples.tsv")
     if "sra_samples" in config.keys():
