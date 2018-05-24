@@ -40,7 +40,7 @@ RUN snakemake --snakefile ${pipeline_folder}/rules/downloading/adapting_genome_f
 
 RUN snakemake --snakefile ${pipeline_folder}/workflows/check_resistance_databases.rules --use-conda --conda-prefix ${conda_folder} ${pipeline_folder}/workflows/../data/Mycobacterium_tuberculosis/mutations/currated_db_all/correct.bed ${pipeline_folder}/workflows/../data/Mycobacterium_tuberculosis/mutations/level_four_agreement/correct.bed ${pipeline_folder}/workflows/../data/Mycobacterium_tuberculosis/mutations/rgi_annotated_full_2_0_0/correct.bed ${pipeline_folder}/workflows/../data/Mycobacterium_tuberculosis/mutations/mykrobe_annotated/correct.bed ${pipeline_folder}/workflows/../data/Mycobacterium_tuberculosis/mutations/miotto_high_moderate_minimum_confidence_annotated/correct.bed ${pipeline_folder}/workflows/../data/Mycobacterium_tuberculosis/mutations/walker_resistant_annotated/correct.bed 
  
-RUN cp ${pipeline_folder}/*.tsv . && cp ${pipeline_folder}/config.yaml .
+RUN cp ${pipeline_folder}/*.tsv . && cp ${pipeline_folder}/config.yml .
 
 RUN echo '' > links/Myco-10_S10_L001_R1.fastq.gz && echo '' > links/Myco-10_S10_L001_R2.fastq.gz && echo '' > core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa && echo '' > ${main}/data/references/mash_sketch_human.msh
 
@@ -48,7 +48,7 @@ RUN mkdir -p core_genomes/parsnp/Mycobacterium_tuberculosis/
 
 RUN wget -qO- https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh > ${main}/data/references/mash_sketch.msh
 
-RUN snakemake --snakefile ${pipeline_folder}/workflows/full_pipeline.rules --use-conda --create-envs-only --conda-prefix ${conda_folder} --configfile config.yaml quality/multiqc/assembly/multiqc_report.html samples/M10/resistance/mykrobe.tsv typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/core_parsnp_538048/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/full_genome_M10_assembled_genome/bwa/distances_in_snp_mst_no_st.svg virulence_summary.xlsx typing/mlst/summary.xlsx resistance/rgi_summary.xlsx resistance/mykrobe_summary.xlsx phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/full_genome_538048/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/core_parsnp_538048/bwa/phylogeny_no_st.svg contamination/distances_formated.xlsx -j 4 --config species="Mycobacterium_tuberculosis"
+RUN snakemake --snakefile ${pipeline_folder}/workflows/full_pipeline.rules --use-conda --create-envs-only --conda-prefix ${conda_folder} --configfile config.yml quality/multiqc/assembly/multiqc_report.html samples/M10/resistance/mykrobe.tsv typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/core_parsnp_538048/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/full_genome_M10_assembled_genome/bwa/distances_in_snp_mst_no_st.svg virulence_summary.xlsx typing/mlst/summary.xlsx resistance/rgi_summary.xlsx resistance/mykrobe_summary.xlsx phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/full_genome_538048/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/core_parsnp_538048/bwa/phylogeny_no_st.svg contamination/distances_formated.xlsx -j 4 --config species="Mycobacterium_tuberculosis"
 
 RUN conda clean --all
 
@@ -60,7 +60,7 @@ RUN  /bin/bash -c 'source activate /opt/conda/envs/618592fe/ && efetch -db assem
 
 RUN  /bin/bash -c 'source activate /opt/conda/envs/c327f08f/ && mash sketch -o ${main}/data/references/mash_sketch_human.msh ${main}/data/references/1493941/genome_fasta.fasta'
 
-RUN rm -rf ${main}/data/references/1493941/ && rm -rf links/ &&  rm core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa && rm config.yaml && rm *.tsv
+RUN rm -rf ${main}/data/references/1493941/ && rm -rf links/ &&  rm core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa && rm config.yml && rm *.tsv
 
 RUN mkdir ${main}/data/analysis/
 
