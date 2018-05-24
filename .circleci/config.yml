@@ -185,22 +185,12 @@ jobs:
       - run:
           name: Download SRAs 
           command: |
-            RUN mkdir -p ${main}/data/validation/PRJEB7847/
-
-WORKDIR ${main}/data/validation/PRJEB7847/
-
-RUN ln -s ${main}/data/core_genomes/ core_genomes
-
-RUN ln -s ${main}/data/references/ references
-
-RUN /bin/bash -c 'source activate /opt/conda/envs/618592fe/ && esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 5 > PRJEB7847_Staphylococcus-aureus.tsv'
             mkdir -p ${data}/validation/Staph_aureus/
             cd ${data}/validation/Staph_aureus/
             ln -s ../../core_genomes/ core_genomes
             ln -s ../../references/ references
             source activate ${conda_folder}/dd53a5a3/
             esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 5 > PRJEB7847_Staphylococcus-aureus.tsv'
-            snakemake --snakefile ../../../${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ../../../${pipeline_folder}/data/validation_datasets/config.yaml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf contamination/distances_formated.xlsx --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
 
