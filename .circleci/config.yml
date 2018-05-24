@@ -194,10 +194,8 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - build
       - create_all_refs:
-          requires:
-            - build
+      - build
       - test_MTB_resistance:
           requires:
             - create_all_refs
