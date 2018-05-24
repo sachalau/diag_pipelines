@@ -66,6 +66,7 @@ jobs:
           root: /home/pipeline_user/
           paths:
             - conda/
+
   create_all_refs:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -86,11 +87,8 @@ jobs:
              conda config --add channels conda-forge
              conda config --add channels bioconda
       - run:
-          name: Install fonts and unzip
-          command: apt-get install -y fontconfig unzip
-      - run:
-          name: Install snakemake with conda
-          command: conda install snakemake=4.8.0=py36_0
+          name: Install snakemake, entrez-direct and mash with conda
+          command: conda install snakemake=4.8.0=py36_0 mash=2.0=gsl1.16_0 entrez-direct=7.70=pl5.22.0_0
       - run:
           name: Download MASH sketchs
           command: |
@@ -122,36 +120,32 @@ jobs:
       - run:
           name: Create human genome MASH sketch
           command: |
-             source activate ${conda_folder}/206eba9c/
              mkdir -p ${data_folder}/references/1493941/
              efetch -db assembly -id 1493941 -format docsum | xtract -pattern DocumentSummary -element FtpPath_RefSeq | sed "s/\(\/GCF_.*\)/\\1\\1_genomic.fna.gz/" | xargs -I % wget -qO- % | gzip -d > ${data_folder}/references/1493941/genome_fasta.fasta
-             source deactivate
-             source activate ${conda_folder}/64d9220c/
              mash sketch -o ${data_folder}/references/mash_sketch_human.msh ${data_folder}/references/1493941/genome_fasta.fasta
-             source deactivate
              rm -rf ${data_folder}/references/1493941/
-      - run:
-          name: Download and load RGI data
-          command: |
-             wget https://card.mcmaster.ca/download/0/broadstreet-v1.1.9.tar.bz2 --no-check-certificate
-             tar xf broadstreet-v1.1.9.tar.bz2
-             source activate ${conda_folder}/e7260ed8/
-             rgi_load -i card.json
-             source deactivate
-      - save_cache:
-          key: v1-{{ .Branch }}-{{ .Revision }}   
-          paths: cache_references.txt
+
 
   test_MTB_resistance:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
-          pipeline_folder: /opt/diag_pipelines/
+          pipeline_folder: /home/pipeline_user/src/
           data_folder: /home/pipeline_user/data/
-          conda_folder: /opt/conda/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
     steps:
-      - restore_cache:
-          key: v1-{{ .Branch }}-{{ .Revision }}
+      - checkout:
+          path: src/
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake and entrez-direct with conda
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
       - run:
           name: Download SRA XTR MTB 
           command: |
@@ -159,7 +153,6 @@ jobs:
             cd ${data}/validation/MTB-XTR/
             ln -s ../../core_genomes/ core_genomes
             ln -s ../../references/ references
-            source activate ${conda_folder}/dd53a5a3/
             esearch -db sra -query "SRR1158874[ID] OR SRR1158923[ID] OR SRR1158907[ID] OR SRR1158898[ID]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > MTB-XTR.tsv'
       - run:
           name: Run snakemake analysis
@@ -196,11 +189,7 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - build
-      - create_all_refs:
+      - create_all_refs
+      - test_MTB_resistance
           requires:
-            - build
-      - test_MTB_resistance:
-          requires:
-            - create_all_refs
-
+            - create_all_refs 
