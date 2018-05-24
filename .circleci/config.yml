@@ -147,7 +147,16 @@ jobs:
      steps:
       - restore_cache:
           key: v1-{{ .Branch }}-{{ .Revision }}
-        
+      - run:
+          name: Download SRA XTR MTB and run analysis
+          command: |
+            mkdir -p ${data}/validation/MTB-XTR/
+            cd ${data}/validation/MTB-XTR/
+            ln -s ../../core_genomes/ core_genomes
+            ln -s ../../references/ references
+            source activate ${conda_folder}/dd53a5a3/
+            esearch -db sra -query "SRR1158874[ID] OR SRR1158923[ID] OR SRR1158907[ID] OR SRR1158898[ID]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > MTB-XTR.tsv'
+            snakemake --snakefile ../../../${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ../../../${pipeline_folder}/data/validation_datasets/config.yaml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf contamination/distances_formated.xlsx --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 workflows:
   version: 2
