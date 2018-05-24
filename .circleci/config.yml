@@ -124,7 +124,10 @@ jobs:
              efetch -db assembly -id 1493941 -format docsum | xtract -pattern DocumentSummary -element FtpPath_RefSeq | sed "s/\(\/GCF_.*\)/\\1\\1_genomic.fna.gz/" | xargs -I % wget -qO- % | gzip -d > ${data_folder}/references/1493941/genome_fasta.fasta
              mash sketch -o ${data_folder}/references/mash_sketch_human.msh ${data_folder}/references/1493941/genome_fasta.fasta
              rm -rf ${data_folder}/references/1493941/
-
+      - persist_to_workspace:
+          root: /home/pipeline_user/
+          paths:
+            - data/
 
   test_MTB_resistance:
     docker:
@@ -135,6 +138,8 @@ jobs:
           conda_folder: /home/pipeline_user/conda/
     working_directory:  /home/pipeline_user/
     steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
       - checkout:
           path: src/
       - run:
@@ -153,25 +158,41 @@ jobs:
             cd ${data}/validation/MTB-XTR/
             ln -s ../../core_genomes/ core_genomes
             ln -s ../../references/ references
-            esearch -db sra -query "SRR1158874[ID] OR SRR1158923[ID] OR SRR1158907[ID] OR SRR1158898[ID]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > MTB-XTR.tsv'
+            esearch -db sra -query "SRR1158874[ID] OR SRR1158923[ID] OR SRR1158907[ID] OR SRR1158898[ID]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > MTB-XTR.tsv
       - run:
           name: Run snakemake analysis
           command: |
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf contamination/distances_formated.xlsx --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
-  test_Staph_aureus:
+  test_Staph_aureus_resistance:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
-          pipeline_folder: diag_pipelines/
-          data_folder: data/
-          conda_folder: /opt/conda/
+          pipeline_folder: /home/pipeline_user/src/
+          data_folder: /home/pipeline_user/data/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
     steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
       - checkout:
-          path: $pipeline_folder
-      - restore_cache:
-          key: v1-{{ .Branch }}-{{ .Revision }}
+          path: src/
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake, rgi and entrez-direct with conda
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0 rgi=3.2.1=py27_2
+      - run:
+          name: Load RGI data
+          command: |
+             wget https://card.mcmaster.ca/download/0/broadstreet-v1.1.9.tar.bz2 --no-check-certificate
+             tar xf broadstreet-v1.1.9.tar.bz2
+             rgi_load -i card.json
       - run:
           name: Download SRAs 
           command: |
