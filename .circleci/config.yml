@@ -82,7 +82,7 @@ jobs:
     working_directory:  /home/pipeline_user/
     steps:
       - checkout:
-          path: $pipeline_folder
+          path: ../../$pipeline_folder
       - run:
           name: Create env file
           command: |
@@ -144,14 +144,10 @@ jobs:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
-          pipeline_folder: diag_pipelines/
-          data_folder: data/
+          pipeline_folder: /opt/diag_pipelines/
+          data_folder: /home/pipeline_user/data/
           conda_folder: /opt/conda/
     steps:
-      - run:
-          name: Create env file
-          command: |
-             cat ${pipeline_folder}/envs/*.yaml > all_envs.yaml
       - restore_cache:
           key: v1-{{ .Branch }}-{{ .Revision }}
       - run:
@@ -166,8 +162,7 @@ jobs:
       - run:
           name: Run snakemake analysis
           command: |
-
-            snakemake --snakefile ../../../${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ../../../${pipeline_folder}/data/validation_datasets/config.yaml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf contamination/distances_formated.xlsx --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yaml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf contamination/distances_formated.xlsx --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
   test_Staph_aureus:
@@ -203,4 +198,7 @@ workflows:
       - create_all_refs:
           requires:
             - build
+      - test_MTB_resistance:
+          requires:
+            - create_all_refs
 
