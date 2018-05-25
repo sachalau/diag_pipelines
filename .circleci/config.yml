@@ -142,6 +142,7 @@ jobs:
           at: /home/pipeline_user/
       - checkout:
           path: src/
+      - run: ls -R *
       - run:
           name: Add chanels to conda
           command: |
@@ -162,6 +163,7 @@ jobs:
       - run:
           name: Run snakemake analysis
           command: |
+            cd ${data}/validation/MTB-XTR/
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
