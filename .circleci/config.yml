@@ -142,7 +142,7 @@ jobs:
           at: /home/pipeline_user/
       - checkout:
           path: src/
-      - run: ls -R *
+      - run: ls -R * 
       - run:
           name: Add chanels to conda
           command: |
