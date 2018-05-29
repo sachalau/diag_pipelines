@@ -1,6 +1,8 @@
 include:
     "typing.rules"
 
+data_path = "/home/pipeline_user/data/"
+    
 if "mykrobe_panel" not in config.keys():
     mykrobe_panel = ""
 else:
