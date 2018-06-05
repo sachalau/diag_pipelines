@@ -4,7 +4,7 @@ rule keep_only_annotated_region:
     input:
         genotype = "samples/{sample}/snps/gatk/" + reference_assembly_for_resistance[species] + "/bwa/snps.g.vcf.gz",
         genotype_tbi = "samples/{sample}/snps/gatk/" + reference_assembly_for_resistance[species] + "/bwa/snps.g.vcf.gz.tbi",
-        bed_gz_correct = pipeline_path + "data/" + species + "/mutations/{db}/correct.bed.gz",
+        bed_gz_correct = data_path + "resistance_db/" + species + "/mutations/{db}/correct.bed.gz",
     output:
         genotype = "samples/{sample}/resistance/{db}/snps_region_filtered.g.vcf",
     shell:
@@ -18,7 +18,7 @@ rule decompose_multiallelic_positions_from_genotyping:
     input:
         genotype = "samples/{sample}/resistance/{db}/snps_region_filtered.g.vcf.gz",
         genotype_tbi = "samples/{sample}/resistance/{db}/snps_region_filtered.g.vcf.gz.tbi",
-        reference = "references/" + reference_assembly_for_resistance[species] + "/genome_fasta.fasta",
+        reference = data_path + "references/" + reference_assembly_for_resistance[species] + "/genome_fasta.fasta",
     output:
         genotype_decomposed = "samples/{sample}/resistance/{db}/snps_decomposed.g.vcf",
     log:
@@ -32,8 +32,8 @@ rule annotate_positions_from_genotyping:
     conda:
         pipeline_path + "envs/bcftools.yml"
     input:
-        bed_gz_correct =  pipeline_path + "data/" + species + "/mutations/{db}/correct.bed.gz",
-        bed_tbi_correct =  pipeline_path + "data/" + species + "/mutations/{db}/correct.bed.gz.tbi", 
+        bed_gz_correct =  data_path + "resistance_db/" + species + "/mutations/{db}/correct.bed.gz",
+        bed_tbi_correct =  data_path  + "resistance_db/" + species + "/mutations/{db}/correct.bed.gz.tbi", 
         genotype = "samples/{sample}/resistance/{db}/snps_decomposed.g.vcf.gz",
         genotype_tbi = "samples/{sample}/resistance/{db}/snps_decomposed.g.vcf.gz.tbi",
     output:

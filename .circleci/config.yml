@@ -143,7 +143,6 @@ jobs:
           at: /home/pipeline_user/
       - checkout:
           path: src/
-      - run: ls -R * 
       - run:
           name: Add chanels to conda
           command: |
@@ -156,15 +155,14 @@ jobs:
       - run:
           name: Download SRA XTR MTB 
           command: |
-            mkdir -p ${data}/validation/MTB-XTR/
-            cd ${data}/validation/MTB-XTR/
-            ln -s ../../core_genomes/ core_genomes
-            ln -s ../../references/ references
+            mkdir -p validation/MTB-XTR/
+            cd validation/MTB-XTR/
             esearch -db sra -query "SRR1158874[ID] OR SRR1158923[ID] OR SRR1158907[ID] OR SRR1158898[ID]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > MTB-XTR.tsv
       - run:
           name: Run snakemake analysis
+          no_output_timeout: 2h
           command: |
-            cd ${data}/validation/MTB-XTR/
+            cd validation/MTB-XTR/
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-137/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-137/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-134/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-134/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-122/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-122/resistance/rgi_annotated_full_2_0_0/mutations.vcf --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
