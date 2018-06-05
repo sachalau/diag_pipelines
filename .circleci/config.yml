@@ -158,6 +158,7 @@ jobs:
           command: |
             mkdir -p validation/MTB-XTR/
             cd validation/MTB-XTR/
+            ln -s ${data_folder}/references references
             esearch -db sra -query "SRR1158874[ID] OR SRR1158923[ID] OR SRR1158907[ID] OR SRR1158898[ID]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > MTB-XTR.tsv
       - run:
           name: Run snakemake analysis
