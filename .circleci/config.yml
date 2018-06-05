@@ -124,7 +124,8 @@ jobs:
              efetch -db assembly -id 1493941 -format docsum | xtract -pattern DocumentSummary -element FtpPath_RefSeq | sed "s/\(\/GCF_.*\)/\\1\\1_genomic.fna.gz/" | xargs -I % wget -qO- % | gzip -d > ${data_folder}/references/1493941/genome_fasta.fasta
              mash sketch -o ${data_folder}/references/mash_sketch_human.msh ${data_folder}/references/1493941/genome_fasta.fasta
              rm -rf ${data_folder}/references/1493941/
-             rm -rf ${data_folder}/logs/
+      - run: rm -rf ${data_folder}/logs/
+      - run: rm -rf ${data_folder}/.snakemake/
       - persist_to_workspace:
           root: /home/pipeline_user/
           paths:
