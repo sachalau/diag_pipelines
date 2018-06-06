@@ -147,6 +147,7 @@ jobs:
       - checkout:
           path: src/
       - run: export _JAVA_OPTIONS=-Xmx3g
+      - run: apt-get install fontconfig
       - run:
           name: Add chanels to conda
           command: |
