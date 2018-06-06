@@ -110,8 +110,12 @@ jobs:
           at: /home/pipeline_user/
       - checkout:
           path: src/
-      - run: export _JAVA_OPTIONS=-Xmx3g
-      - run: apt-get install -y fontconfig
+      - run:
+          name: Set maximum heap size Java
+          command: export _JAVA_OPTIONS=-Xmx3g
+      - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
       - run:
           name: Add chanels to conda
           command: |
@@ -149,7 +153,9 @@ jobs:
           at: /home/pipeline_user/
       - checkout:
           path: src/
-      - run: export _JAVA_OPTIONS=-Xmx3g
+      - run:
+          name: Set maximum heap size Java
+          command: export _JAVA_OPTIONS=-Xmx3g
       - run:
           name: Add chanels to conda
           command: |
@@ -171,7 +177,7 @@ jobs:
           no_output_timeout: 2h
           command: |
             cd validation/MTB-XTR/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-114/resistance/currated_db_all/mutations.vcf --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
   test_Staph_aureus_resistance:
@@ -194,7 +200,7 @@ jobs:
              conda config --add channels conda-forge
              conda config --add channels bioconda
       - run:
-          name: Install snakemake, rgi and entrez-direct with conda
+          name: Install snakemake and entrez-direct with conda
           command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0 
       - run:
           name: Download SRAs 
@@ -203,13 +209,13 @@ jobs:
             cd validation/Staph_aureus_resistance/
             ln -s ../../core_genomes/ core_genomes
             ln -s ../../references/ references
-            esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 3 > PRJEB7847_Staphylococcus-aureus.tsv' || true
+            esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 3 > PRJEB7847_Staphylococcus-aureus.tsv || true
       - run:
           name: Run snakemake analysis
           no_output_timeout: 2h
           command: |
             cd validation/Staph_aureus_resistance/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 all_resistance_summaries --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 all_resistance_summaries --config sra_samples="PRJEB7847_Staphylococcus-aureus.tsv" species="Staphylococcus_aureus" 
 
 
 
