@@ -200,7 +200,7 @@ jobs:
           name: Download SRAs 
           command: |
             mkdir -p validation/Staph_aureus_resistance/
-            cd alidation/Staph_aureus_resistance/
+            cd validation/Staph_aureus_resistance/
             ln -s ../../core_genomes/ core_genomes
             ln -s ../../references/ references
             esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 3 > PRJEB7847_Staphylococcus-aureus.tsv' || true
