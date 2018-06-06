@@ -87,8 +87,8 @@ jobs:
              conda config --add channels conda-forge
              conda config --add channels bioconda
       - run:
-          name: Install -y fontconfig
-          command: apt-get install fontconfig
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
       - run:
           name: Install snakemake, entrez-direct and mash with conda
           command: conda install snakemake=4.8.0=py36_0 mash=2.0=gsl1.16_0 entrez-direct=7.70=pl5.22.0_0
