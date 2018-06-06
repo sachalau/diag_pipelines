@@ -35,7 +35,7 @@ rule concatenate_consensus_fasta_files_all_samples_cgMLST:
         fasta = expand("samples/{sample}/alignment/{{snp_caller}}/cgMLST/{{mapping_method}}/consensus.fa", sample=read_naming.keys()),
         ref = "references/full_genome_" + str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/genome_fasta.fasta",
     output:
-        alignment="typing/{snp_caller}/full_genome_{reference}/{mapping_method}/alignment.fa"
+        alignment="typing/{snp_caller}/cgMLST/{mapping_method}/alignment.fa"
     shell:
         """
         sed "s/^>.*/>{reference}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
