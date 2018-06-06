@@ -14,7 +14,7 @@ rule assess_quality_single_reads_with_fastqc:
         
 rule assess_quality_paired_reads_with_fastqc:
     conda:
-        pipeline_path + "envs/unzip.yml"
+        pipeline_path + "envs/fastqc.yml"
     input:
         "samples/{sample}/reads/trimmed/R1_paired.fastq",
         "samples/{sample}/reads/trimmed/R2_paired.fastq"
@@ -31,7 +31,7 @@ rule assess_quality_paired_reads_with_fastqc:
 
 rule unzip_fastqc_single:
     conda:
-        pipeline_path + "envs/fastqc.yml"
+        pipeline_path + "envs/unzip.yml"
     input:
         "samples/{sample}/reads/trimmed/fastqc/single_fastqc.zip",
     output:

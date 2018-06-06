@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  deploy_test:
+  build:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -10,6 +10,8 @@ jobs:
           conda_folder: /home/pipeline_user/conda/
     working_directory:  /home/pipeline_user/
     steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
       - checkout:
           path: src/
       - run:
@@ -25,73 +27,11 @@ jobs:
              conda config --add channels conda-forge
              conda config --add channels bioconda
       - run:
-          name: Install snakemake with conda
-          command: conda install snakemake=4.8.0=py36_0
-      - run:
-          name: Download all conda environments
-          command: |
-             mkdir -p tmp/links
-             cd tmp
-             cp ${pipeline_folder}/*.tsv .
-             cp ${pipeline_folder}/config.yml .
-             mkdir -p core_genomes/parsnp/Mycobacterium_tuberculosis/
-             mkdir -p core_genomes/cgMLST/
-             mkdir -p references/538048/
-             mkdir -p virulence_factors_db/Staphylococcus_aureus/
-             echo '' > links/Myco-10_S10_L001_R1.fastq.gz 
-             echo '' > links/Myco-10_S10_L001_R2.fastq.gz
-             echo '' > core_genomes/parsnp/Mycobacterium_tuberculosis/parsnp.xmfa
-             echo '' > core_genomes/cgMLST/Mycobacterium_tuberculosis.bed
-             echo '' > references/mash_sketch.msh
-             echo '' > references/mash_sketch_human.msh
-             echo '' > references/538048/genome_fasta.fasta
-             echo '' > virulence_factors_db/Staphylococcus_aureus/virulence_factors.tsv
-             snakemake --snakefile ${pipeline_folder}/workflows/full_pipeline.rules --use-conda --create-envs-only --conda-prefix ${conda_folder} --configfile config.yml quality/multiqc/assembly/multiqc_report.html samples/M10/resistance/mykrobe.tsv typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/core_parsnp_538048/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/full_genome_M10_assembled_genome/bwa/distances_in_snp_mst_no_st.svg virulence_summary.xlsx typing/mlst/summary.xlsx resistance/rgi_summary.xlsx resistance/mykrobe_summary.xlsx phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/full_genome_538048/bwa/phylogeny_no_st.svg phylogeny/gatk_gvcfs/core_parsnp_538048/bwa/phylogeny_no_st.svg contamination/distances_formated.xlsx -j 4 --config species="Mycobacterium_tuberculosis"
-             conda clean --all -y
-             cd ..
-             rm -rf tmp
-      - run:
-          name: Patch mykrobe file
-          command: |
-             patch ${conda_folder}/*/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
-      - run:
-          name: Change rights RGI and Mykrobe folders
-          command: |     
-             chmod -R 777 ${conda_folder}/*/lib/python2.7/site-packages/package/rgi/_db/
-             chmod -R 777 ${conda_folder}/*/lib/python3.6/site-packages/mykatlas/
-      - save_cache:
-          key: v1-{{ checksum "all_envs.yml" }}   
-          paths: cache_downloads.txt
-      - persist_to_workspace:
-          root: /home/pipeline_user/
-          paths:
-            - conda/
-
-  build:
-    docker:
-      - image: continuumio/miniconda3:4.3.27
-        environment:
-          pipeline_folder: /home/pipeline_user/src/
-          data_folder: /home/pipeline_user/data/
-          conda_folder: /home/pipeline_user/conda/
-    working_directory:  /home/pipeline_user/
-    steps:
-      - attach_workspace:
-          at: /home/pipeline_user/
-      - checkout:
-          path: src/
-      - run:
-          name: Add chanels to conda
-          command: |
-             conda config --add channels defaults
-             conda config --add channels conda-forge
-             conda config --add channels bioconda
-      - run:
           name: Install fontconfig
           command: apt-get install -y fontconfig
       - run:
           name: Install snakemake, entrez-direct and mash with conda
-          command: conda install snakemake=4.8.0=py36_0 mash=2.0=gsl1.16_0 entrez-direct=7.70=pl5.22.0_0
+          command: conda install snakemake=4.8.0=py36_0 mash=2.0=gsl1.16_0 entrez-direct=7.70=pl5.22.0_0 rgi=3.2.1=py27_2
       - run:
           name: Install all conda envs
           command: snakemake --snakefile ${pipeline_folder}/workflows/download_environments.rules --list | xargs -I % sh -c "snakemake --snakefile ${pipeline_folder}/workflows/download_environments.rules --use-conda  --create-envs-only --conda-prefix ${conda_folder} %"
@@ -133,8 +73,29 @@ jobs:
              efetch -db assembly -id 1493941 -format docsum | xtract -pattern DocumentSummary -element FtpPath_RefSeq | sed "s/\(\/GCF_.*\)/\\1\\1_genomic.fna.gz/" | xargs -I % wget -qO- % | gzip -d > ${data_folder}/references/1493941/genome_fasta.fasta
              mash sketch -o ${data_folder}/references/mash_sketch_human.msh ${data_folder}/references/1493941/genome_fasta.fasta
              rm -rf ${data_folder}/references/1493941/
-      - run: rm -rf ${data_folder}/logs/
-      - run: rm -rf ${data_folder}/.snakemake/
+      - run:
+          name: Load RGI data
+          command: |
+             wget https://card.mcmaster.ca/download/0/broadstreet-v1.1.9.tar.bz2 --no-check-certificate
+             tar xf broadstreet-v1.1.9.tar.bz2
+             rgi_load -i card.json    
+      - run: 
+          name: Clean folders 
+          command: |
+             rm -rf ${data_folder}/logs/
+             rm -rf ${data_folder}/.snakemake/
+      - run:
+          name: Patch mykrobe file
+          command: |
+             patch ${conda_folder}/*/lib/python3.6/site-packages/mykatlas/typing/typer/presence.py < ${pipeline_folder}/patches/mykrobe.patch
+      - run:
+          name: Change rights RGI and Mykrobe folders
+          command: |     
+             chmod -R 777 ${conda_folder}/*/lib/python2.7/site-packages/package/rgi/_db/
+             chmod -R 777 ${conda_folder}/*/lib/python3.6/site-packages/mykatlas/
+      - save_cache:
+          key: v1-{{ checksum "all_envs.yml" }}   
+          paths: cache_downloads.txt
       - persist_to_workspace:
           root: /home/pipeline_user/
           paths:
@@ -240,22 +201,21 @@ jobs:
              conda config --add channels bioconda
       - run:
           name: Install snakemake, rgi and entrez-direct with conda
-          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0 rgi=3.2.1=py27_2
-      - run:
-          name: Load RGI data
-          command: |
-             wget https://card.mcmaster.ca/download/0/broadstreet-v1.1.9.tar.bz2 --no-check-certificate
-             tar xf broadstreet-v1.1.9.tar.bz2
-             rgi_load -i card.json
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0 
       - run:
           name: Download SRAs 
           command: |
-            mkdir -p ${data}/validation/Staph_aureus/
-            cd ${data}/validation/Staph_aureus/
+            mkdir -p validation/Staph_aureus_resistance/
+            cd alidation/Staph_aureus_resistance/
             ln -s ../../core_genomes/ core_genomes
             ln -s ../../references/ references
-            source activate ${conda_folder}/dd53a5a3/
-            esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 5 > PRJEB7847_Staphylococcus-aureus.tsv'
+            esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 3 > PRJEB7847_Staphylococcus-aureus.tsv' || true
+      - run:
+          name: Run snakemake analysis
+          no_output_timeout: 2h
+          command: |
+            cd validation/Staph_aureus_resistance/
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 all_resistance_summaries --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
 
@@ -269,6 +229,9 @@ workflows:
           requires:
             - build           
       - test_MTB_typing:
+          requires:
+            - build           
+      - test_Staph_aureus_resistance:
           requires:
             - build           
 
