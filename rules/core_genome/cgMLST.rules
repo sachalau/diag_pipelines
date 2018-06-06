@@ -11,14 +11,32 @@ rule extract_cgMLST_regions_from_vcf:
         """
         bcftools view --regions-file {input[bed]} --output-file {output[core_genome_vcf]} {input[vcf_mutation_type]}
         """
-    
-rule link_reference_genome_for_cgMLST:
+  
+rule create_consensus_sequence_by_sample_cgMLST:
+    conda:
+        pipeline_path + "envs/bcftools.yml"
     input:
-        genome_ref = "references/" + str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/genome_fasta.fasta"
+        alt = "samples/{sample}/snps/{snp_caller}/full_genome_" + str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/{mapping_method}/alternative_snp.vcf.gz",
+        alt_tbi = "samples/{sample}/snps/{snp_caller}/full_genome_" + str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/{mapping_method}/alternative_snp.vcf.gz.tbi",
+        unknowns = "samples/{sample}/snps/{snp_caller}/full_genome_" + str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/{mapping_method}/unknowns.tab",
+        ref = "references/full_genome_"+ str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/genome_fasta.fasta",
     output:
-        genome_cgmlst = "references/cgMLST/genome_{format}.{format}"
+        alignment = "samples/{sample}/alignment/{snp_caller}/cgMLST/{mapping_method}/consensus.fa",
     shell:
         """
-        ln -sr {input[genome_ref]} {output[genome_cgmlst]}
+        bcftools consensus --mask {input[unknowns]} --fasta-ref {input[ref]} --output {output[alignment]} --sample {wildcards.sample} {input[alt]}
+        sed -i "s/^>.*/>{wildcards.sample}/" {output[alignment]}
         """
+
     
+
+rule concatenate_consensus_fasta_files_all_samples_cgMLST:
+    input:
+        fasta = expand("samples/{sample}/alignment/{{snp_caller}}/cgMLST/{{mapping_method}}/consensus.fa", sample=read_naming.keys()),
+        ref = "references/full_genome_" + str(all_core_genome_dbs.loc[species, "ReferenceGenome"]) + "/genome_fasta.fasta",
+    output:
+        alignment="typing/{snp_caller}/full_genome_{reference}/{mapping_method}/alignment.fa"
+    shell:
+        """
+        sed "s/^>.*/>{reference}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
+        """

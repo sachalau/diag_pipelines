@@ -32,12 +32,12 @@ rule create_consensus_sequence_by_sample:
     conda:
         pipeline_path + "envs/bcftools.yml"
     input:
-        alt="samples/{sample}/snps/{snp_caller}/{core_genome_or_full_genome}/{mapping_method}/alternative_snp.vcf.gz",
-        alt_tbi="samples/{sample}/snps/{snp_caller}/{core_genome_or_full_genome}/{mapping_method}/alternative_snp.vcf.gz.tbi",
-        unknowns="samples/{sample}/snps/{snp_caller}/{core_genome_or_full_genome}/{mapping_method}/unknowns.tab",
-        ref="references/{core_genome_or_full_genome}/genome_fasta.fasta",
+        alt="samples/{sample}/snps/{snp_caller}/full_genome_{reference}/{mapping_method}/alternative_snp.vcf.gz",
+        alt_tbi="samples/{sample}/snps/{snp_caller}/full_genome_{reference}/{mapping_method}/alternative_snp.vcf.gz.tbi",
+        unknowns="samples/{sample}/snps/{snp_caller}/full_genome_{reference}/{mapping_method}/unknowns.tab",
+        ref="references/full_genome_{reference}/genome_fasta.fasta",
     output:
-        alignment="samples/{sample}/alignment/{snp_caller}/{core_genome_or_full_genome}/{mapping_method}/consensus.fa",
+        alignment="samples/{sample}/alignment/{snp_caller}/full_genome_{reference}/{mapping_method}/consensus.fa",
     shell:
         """
         bcftools consensus --mask {input[unknowns]} --fasta-ref {input[ref]} --output {output[alignment]} --sample {wildcards.sample} {input[alt]}
@@ -47,11 +47,11 @@ rule create_consensus_sequence_by_sample:
 
 rule concatenate_consensus_fasta_files_all_samples:
     input:
-        fasta = expand("samples/{sample}/alignment/{{snp_caller}}/{{core_genome_or_full_genome}}/{{mapping_method}}/consensus.fa", sample=read_naming.keys()),
-        ref = "references/{core_genome_or_full_genome}/genome_fasta.fasta",
+        fasta = expand("samples/{sample}/alignment/{{snp_caller}}/full_genome_{{reference}}/{{mapping_method}}/consensus.fa", sample=read_naming.keys()),
+        ref = "references/full_genome_{reference}/genome_fasta.fasta",
     output:
-        alignment="typing/{snp_caller}/{core_genome_or_full_genome}/{mapping_method}/alignment.fa"
+        alignment="typing/{snp_caller}/full_genome_{reference}/{mapping_method}/alignment.fa"
     shell:
         """
-        sed "s/^>.*/>{wildcards.core_genome_or_full_genome}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
+        sed "s/^>.*/>{reference}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
         """
