@@ -1,0 +1,84 @@
+rule bcftools_download:
+    conda: "../envs/bcftools.yml"
+    shell: "echo ok"
+rule bedtools_download:
+    conda: "../envs/bedtools.yml"
+    shell: "echo ok"
+rule biopython_download:
+    conda: "../envs/biopython.yml"
+    shell: "echo ok"
+rule blast_download:
+    conda: "../envs/blast.yml"
+    shell: "echo ok"
+rule bwa_samtools_download:
+    conda: "../envs/bwa-samtools.yml"
+    shell: "echo ok"
+rule entrez_direct_download:
+    conda: "../envs/entrez-direct.yml"
+    shell: "echo ok"
+rule fastqc_download:
+    conda: "../envs/fastqc.yml"
+    shell: "echo ok"
+rule freebayes_download:
+    conda: "../envs/freebayes.yml"
+    shell: "echo ok"
+rule gatk_download:
+    conda: "../envs/gatk.yml"
+    shell: "echo ok"
+rule htslib_download:
+    conda: "../envs/htslib.yml"
+    shell: "echo ok"
+rule igraph_download:
+    conda: "../envs/igraph.yml"
+    shell: "echo ok"
+rule mash_download:
+    conda: "../envs/mash.yml"
+    shell: "echo ok"
+rule mlst_download:
+    conda: "../envs/mlst.yml"
+    shell: "echo ok"
+rule multiqc_download:
+    conda: "../envs/multiqc.yml"
+    shell: "echo ok"
+rule mykrobe_download:
+    conda: "../envs/mykrobe.yml"
+    shell: "echo ok"
+rule newick_utils_download:
+    conda: "../envs/newick-utils.yml"
+    shell: "echo ok"
+rule pandas_openpyxl_pronto_xlrd_download:
+    conda: "../envs/pandas-openpyxl-pronto-xlrd.yml"
+    shell: "echo ok"
+rule prokka_download:
+    conda: "../envs/prokka.yml"
+    shell: "echo ok"
+rule qualimap_download:
+    conda: "../envs/qualimap.yml"
+    shell: "echo ok"
+rule quast_download:
+    conda: "../envs/quast.yml"
+    shell: "echo ok"
+rule raxml_download:
+    conda: "../envs/raxml.yml"
+    shell: "echo ok"
+rule rgi_download:
+    conda: "../envs/rgi.yml"
+    shell: "echo ok"
+rule samtools_download:
+    conda: "../envs/samtools.yml"
+    shell: "echo ok"
+rule spades_download:
+    conda: "../envs/spades.yml"
+    shell: "echo ok"
+rule sra_tools_download:
+    conda: "../envs/sra-tools.yml"
+    shell: "echo ok"
+rule trimmomatic_download:
+    conda: "../envs/trimmomatic.yml"
+    shell: "echo ok"
+rule unzip_download:
+    conda: "../envs/unzip.yml"
+    shell: "echo ok"
+rule vt_download:
+    conda: "../envs/vt.yml"
+    shell: "echo ok"
