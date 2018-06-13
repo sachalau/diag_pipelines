@@ -197,6 +197,9 @@ jobs:
       - checkout:
           path: src/
       - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
           name: Add chanels to conda
           command: |
              conda config --add channels defaults
