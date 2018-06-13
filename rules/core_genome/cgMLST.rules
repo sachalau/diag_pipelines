@@ -38,5 +38,5 @@ rule concatenate_consensus_fasta_files_all_samples_cgMLST:
         alignment="typing/{snp_caller}/cgMLST/{mapping_method}/alignment.fa"
     shell:
         """
-        sed "s/^>.*/>{reference}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
+        sed "s/^>.*/>cgMLST/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
         """
