@@ -154,6 +154,9 @@ jobs:
       - checkout:
           path: src/
       - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
           name: Set maximum heap size Java
           command: export _JAVA_OPTIONS=-Xmx3g
       - run:
@@ -207,8 +210,8 @@ jobs:
           command: |
             mkdir -p validation/Staph_aureus_resistance/
             cd validation/Staph_aureus_resistance/
-            ln -s ../../core_genomes/ core_genomes
-            ln -s ../../references/ references
+            ln -s ${data_folder}/core_genomes/ core_genomes
+            ln -s ${data_folder}/references/ references
             esearch -db sra -query "PRJEB7847[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 3 > PRJEB7847_Staphylococcus-aureus.tsv || true
       - run:
           name: Run snakemake analysis
