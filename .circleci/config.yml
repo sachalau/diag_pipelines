@@ -104,6 +104,7 @@ jobs:
           pipeline_folder: /home/pipeline_user/src/
           data_folder: /home/pipeline_user/data/
           conda_folder: /home/pipeline_user/conda/
+    parallelism: 4
     working_directory:  /home/pipeline_user/
     steps:
       - attach_workspace:
