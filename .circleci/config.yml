@@ -103,7 +103,6 @@ jobs:
           pipeline_folder: /home/pipeline_user/src/
           data_folder: /home/pipeline_user/data/
           conda_folder: /home/pipeline_user/conda/
-    parallelism: 4
     working_directory:  /home/pipeline_user/
     steps:
       - attach_workspace:
@@ -218,7 +217,7 @@ jobs:
           no_output_timeout: 24h
           command: |
             cd validation/Clostridium_outbreak/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB3006_Clostridium_difficile.tsv" species="Clostridium_difficile"
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB3006_Clostridium_difficile.tsv" species="Clostridioides_difficile"
 
   val_Listeria_outbreak:
     docker:
@@ -257,7 +256,7 @@ jobs:
           name: Run snakemake analysis
           no_output_timeout: 24h
           command: |
-            cd validation/Listeria_oubreak/
+            cd validation/Listeria_outbreak/
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJNA295367_Listeria_monocytogenes.tsv" species="Listeria_monocytogenes"
 
   val_MTB_resistance_strain:
