@@ -96,8 +96,7 @@ jobs:
             - data/
             - conda/
 
-
-  test_MTB_typing:
+  val_MTB_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -133,15 +132,135 @@ jobs:
             cd validation/MTB-typing/
             ln -s ${data_folder}/core_genomes/ core_genomes
             ln -s ${data_folder}/references/ references
-            esearch -db sra -query "PRJEB12011[BIOPROJECT] AND \"Mycobacterium tuberculosis complex\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" | head -n 5 > PRJEB12011_Mycobacterium-tuberculosis.tsv || true
+            esearch -db sra -query "PRJEB12011[BIOPROJECT] AND \"Mycobacterium tuberculosis complex\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > PRJEB12011_Mycobacterium-tuberculosis.tsv || true
       - run:
           name: Run snakemake analysis
-          no_output_timeout: 2h
+          no_output_timeout: 24h
           command: |
             cd validation/MTB-typing/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg typing/gatk_gvcfs/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg typing/freebayes_joint_genotyping/cgMLST/bwa/vcfs/SAMEA3697004_-_SAMEA3697005_in_snp.vcf typing/gatk_gvcfs/full_genome_SAMEA3697006_assembled_genome/bwa/distances_in_snp_mst_no_st.svg --config sra_samples="PRJEB12011_Mycobacterium-tuberculosis.tsv" species="Mycobacterium_tuberculosis"
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules -j 2 --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB12011_Mycobacterium-tuberculosis.tsv" species="Mycobacterium_tuberculosis"
 
-  test_MTB_resistance:
+  val_Salmonella_outbreak:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: /home/pipeline_user/src/
+          data_folder: /home/pipeline_user/data/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
+    steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
+      - checkout:
+          path: src/
+      - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake and entrez-direct with conda
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
+      - run:
+          name: Download SRA MTB for typing
+          command: |
+            mkdir -p validation/Salmonella_outbreak/
+            cd validation/Salmonella_outbreak/
+            ln -s ${data_folder}/core_genomes/ core_genomes
+            ln -s ${data_folder}/references/ references
+            esearch -db sra -query "PRJNA295366[BIOPROJECT] AND \"Salmonella enterica\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > PRJNA295366_Salmonella_enterica.tsv
+      - run:
+          name: Run snakemake analysis
+          no_output_timeout: 24h
+          command: |
+            cd validation/MTB-typing/
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJNA295366_Salmonella_enterica.tsv" species="Salmonella_enterica"
+
+  val_Clostridium_outbreak:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: /home/pipeline_user/src/
+          data_folder: /home/pipeline_user/data/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
+    steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
+      - checkout:
+          path: src/
+      - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake and entrez-direct with conda
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
+      - run:
+          name: Download SRA MTB for typing
+          command: |
+            mkdir -p validation/Clostridium_outbreak/
+            cd validation/Clostridium_outbreak/
+            ln -s ${data_folder}/core_genomes/ core_genomes
+            ln -s ${data_folder}/references/ references
+            esearch -db sra -query "PRJEB3006[BIOPROJECT] AND \"Clostridium difficile\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > PRJEB3006_Clostridium_difficile.tsv
+      - run:
+          name: Run snakemake analysis
+          no_output_timeout: 24h
+          command: |
+            cd validation/MTB-typing/
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB3006_Clostridium_difficile.tsv" species="Clostridium_difficile"
+
+  val_Listeria_outbreak:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: /home/pipeline_user/src/
+          data_folder: /home/pipeline_user/data/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
+    steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
+      - checkout:
+          path: src/
+      - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake and entrez-direct with conda
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
+      - run:
+          name: Download SRA MTB for typing
+          command: |
+            mkdir -p validation/Listeria_outbreak/
+            cd validation/Listeria_outbreak/
+            ln -s ${data_folder}/core_genomes/ core_genomes
+            ln -s ${data_folder}/references/ references
+            esearch -db sra -query "PRJNA295367[BIOPROJECT] AND \"Listeria monocytogenes\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > PRJNA295367_Listeria_monocytogenes.tsv
+      - run:
+          name: Run snakemake analysis
+          no_output_timeout: 24h
+          command: |
+            cd validation/MTB-typing/
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJNA295367_Listeria_monocytogenes.tsv" species="Listeria_monocytogenes"
+
+  val_MTB_resistance_strain:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -184,7 +303,7 @@ jobs:
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 1 resistance/mykrobe_summary.xlsx resistance/rgi_summary.xlsx samples/XTB13-114/resistance/mykrobe_annotated/mutations.vcf samples/XTB13-114/resistance/rgi_annotated_full_2_0_0/mutations.vcf samples/XTB13-114/resistance/currated_db_all/mutations.vcf --config sra_samples="MTB-XTR.tsv" species="Mycobacterium_tuberculosis" 
 
 
-  test_Staph_aureus_resistance:
+  val_Staph_aureus_resistance:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -210,6 +329,9 @@ jobs:
           name: Install snakemake and entrez-direct with conda
           command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0 
       - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
           name: Download SRAs 
           command: |
             mkdir -p validation/Staph_aureus_resistance/
@@ -232,13 +354,22 @@ workflows:
   build_and_test:
     jobs:
       - build
-      - test_MTB_resistance:
+      - val_MTB_resistance_strain:
           requires:
             - build           
-      - test_MTB_typing:
+      - val_Salmonella_outbreak:
           requires:
             - build           
-      - test_Staph_aureus_resistance:
+      - val_Listeria_outbreak:
+          requires:
+            - build           
+      - val_Clostridium_outbreak:
+          requires:
+            - build           
+      - val_MTB_outbreak:
+          requires:
+            - build           
+      - val_Staph_aureus_resistance:
           requires:
             - build           
 
