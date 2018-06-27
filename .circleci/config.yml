@@ -10,8 +10,6 @@ jobs:
           conda_folder: /home/pipeline_user/conda/
     working_directory:  /home/pipeline_user/
     steps:
-      - attach_workspace:
-          at: /home/pipeline_user/
       - checkout:
           path: src/
       - run:
