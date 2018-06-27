@@ -314,9 +314,6 @@ workflows:
       - val_MTB_resistance_strain:
           requires:
             - build           
-      - val_Salmonella_outbreak:
-          requires:
-            - build           
       - val_Listeria_outbreak:
           requires:
             - build           
