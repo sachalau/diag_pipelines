@@ -94,7 +94,7 @@ jobs:
             - data/
             - conda/
             - src/
-	    
+  
   val_MTB_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -171,13 +171,13 @@ jobs:
           no_output_timeout: 24h
           command: |
             cd validation/Clostridium_outbreak/
-	    targets=$(cut -f 25 sras.tsv | tail -n +2 | sed '/^\s*$/d' | sed "s/^/samples\//" | sed "s/$/\/mapping\/bwa\/1503761_deduplicated_filtered.bam/" | tr "\n" " ")
+            targets=$(cut -f 25 sras.tsv | tail -n +2 | sed '/^\s*$/d' | sed "s/^/samples\//" | sed "s/$/\/mapping\/bwa\/1503761_deduplicated_filtered.bam/" | tr "\n" " ")
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 ${targets} phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="sras.tsv" species="Clostridioides_difficile"
       - persist_to_workspace:
           root: /home/pipeline_user/
           paths:
             - validation/Clostridium_outbreak/
-	    
+    
   mst_Clostridium_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -211,7 +211,7 @@ jobs:
           root: /home/pipeline_user/
           paths:
             - validation/Clostridium_outbreak/
-	    
+    
   val_Listeria_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
