@@ -93,7 +93,8 @@ jobs:
           paths:
             - data/
             - conda/
-
+            - src/
+	    
   val_MTB_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -105,11 +106,6 @@ jobs:
     steps:
       - attach_workspace:
           at: /home/pipeline_user/
-      - checkout:
-          path: src/
-      - run:
-          name: Set maximum heap size Java
-          command: export _JAVA_OPTIONS=-Xmx3g
       - run:
           name: Install fontconfig
           command: apt-get install -y fontconfig
@@ -123,7 +119,7 @@ jobs:
           name: Install snakemake and entrez-direct with conda
           command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
       - run:
-          name: Download SRA MTB for typing
+          name: Download SRA
           command: |
             mkdir -p validation/MTB-typing/
             cd validation/MTB-typing/
@@ -137,7 +133,7 @@ jobs:
             cd validation/MTB-typing/
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules -j 2 --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB12011_Mycobacterium-tuberculosis.tsv" species="Mycobacterium_tuberculosis"
 
-  val_Clostridium_outbreak:
+  mapping_Clostridium_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
         environment:
@@ -163,20 +159,59 @@ jobs:
           name: Install snakemake and entrez-direct with conda
           command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
       - run:
-          name: Download SRA MTB for typing
+          name: Download SRAs
           command: |
             mkdir -p validation/Clostridium_outbreak/
             cd validation/Clostridium_outbreak/
             ln -s ${data_folder}/core_genomes/ core_genomes
             ln -s ${data_folder}/references/ references
-            esearch -db sra -query "PRJEB3006[BIOPROJECT] AND \"Clostridium difficile\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > PRJEB3006_Clostridium_difficile.tsv
+            esearch -db sra -query "PRJEB3006[BIOPROJECT] AND \"Clostridium difficile\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > sras.tsv
       - run:
           name: Run snakemake analysis
           no_output_timeout: 24h
           command: |
             cd validation/Clostridium_outbreak/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 --until genotype_with_freebayes_on_all_samples typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB3006_Clostridium_difficile.tsv" species="Clostridioides_difficile"
-
+	    targets=$(cut -f 25 sras.tsv | tail -n +2 | sed '/^\s*$/d' | sed "s/^/samples\//" | sed "s/$/\/mapping\/bwa\/1503761_deduplicated_filtered.bam/" | tr "\n" " ")
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 ${targets} phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="sras.tsv" species="Clostridioides_difficile"
+      - persist_to_workspace:
+          root: /home/pipeline_user/
+          paths:
+            - validation/Clostridium_outbreak/
+	    
+  mst_Clostridium_outbreak:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: /home/pipeline_user/src/
+          data_folder: /home/pipeline_user/data/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
+    steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
+      - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake
+          command: conda install snakemake=4.8.0=py36_0
+      - run:
+          name: Run snakemake analysis
+          no_output_timeout: 24h
+          command: |
+            cd validation/Clostridium_outbreak/
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_no_st.svg --config sra_samples="sras.tsv" species="Clostridioides_difficile" 
+      - persist_to_workspace:
+          root: /home/pipeline_user/
+          paths:
+            - validation/Clostridium_outbreak/
+	    
   val_Listeria_outbreak:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -317,9 +352,12 @@ workflows:
       - val_Listeria_outbreak:
           requires:
             - build           
-      - val_Clostridium_outbreak:
+      - mapping_Clostridium_outbreak:
           requires:
             - build           
+      - mst_Clostridium_outbreak:
+          requires:
+            - mapping_Clostridium_outbreak           
       - val_MTB_outbreak:
           requires:
             - build           
