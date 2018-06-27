@@ -175,7 +175,7 @@ jobs:
           no_output_timeout: 24h
           command: |
             cd validation/Clostridium_outbreak/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB3006_Clostridium_difficile.tsv" species="Clostridioides_difficile"
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 --until genotype_with_freebayes_on_all_samples typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB3006_Clostridium_difficile.tsv" species="Clostridioides_difficile"
 
   val_Listeria_outbreak:
     docker:
