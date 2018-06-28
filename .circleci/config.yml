@@ -219,6 +219,46 @@ jobs:
             cd validation/Listeria_outbreak/
             snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJNA295367_Listeria_monocytogenes.tsv" species="Listeria_monocytogenes"
 
+  val_MRSA_outbreak:
+    docker:
+      - image: continuumio/miniconda3:4.3.27
+        environment:
+          pipeline_folder: /home/pipeline_user/src/
+          data_folder: /home/pipeline_user/data/
+          conda_folder: /home/pipeline_user/conda/
+    working_directory:  /home/pipeline_user/
+    steps:
+      - attach_workspace:
+          at: /home/pipeline_user/
+      - checkout:
+          path: src/
+      - run:
+          name: Install fontconfig
+          command: apt-get install -y fontconfig
+      - run:
+          name: Add chanels to conda
+          command: |
+             conda config --add channels defaults
+             conda config --add channels conda-forge
+             conda config --add channels bioconda
+      - run:
+          name: Install snakemake and entrez-direct with conda
+          command: conda install snakemake=4.8.0=py36_0 entrez-direct=7.70=pl5.22.0_0
+      - run:
+          name: Download SRAs
+          command: |
+            mkdir -p validation/MRSA_outbreak/
+            cd validation/MRSA_outbreak/
+            ln -s ${data_folder}/core_genomes/ core_genomes
+            ln -s ${data_folder}/references/ references
+            esearch -db sra -query "PRJEB2912[BIOPROJECT] AND \"Staphylococcus aureus\"[ORGANISM]" | efetch -db sra -format runinfo | sed "s/,/\t/g" > PRJEB2912_Staphylococcus_aureus.tsv
+      - run:
+          name: Run snakemake analysis
+          no_output_timeout: 24h
+          command: |
+            cd validation/MRSA_outbreak/
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg --config sra_samples="PRJEB2912_Staphylococcus_aureus.tsv" species="Staphylococcus_aureus"
+
   val_MTB_resistance_strain:
     docker:
       - image: continuumio/miniconda3:4.3.27
@@ -316,9 +356,6 @@ workflows:
       - val_MTB_resistance_strain:
           requires:
             - build           
-      - val_Salmonella_outbreak:
-          requires:
-            - build           
       - val_Listeria_outbreak:
           requires:
             - build           
@@ -329,6 +366,9 @@ workflows:
           requires:
             - build           
       - val_Staph_aureus_resistance:
+          requires:
+            - build      
+      - val_MRSA_outbreak:
           requires:
             - build           
 
