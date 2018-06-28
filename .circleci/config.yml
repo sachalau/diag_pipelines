@@ -206,7 +206,7 @@ jobs:
           no_output_timeout: 24h
           command: |
             cd validation/Clostridium_outbreak/
-            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_no_st.svg --config sra_samples="sras.tsv" species="Clostridioides_difficile" 
+            snakemake --snakefile ${pipeline_folder}/workflows/resistance.rules --use-conda --conda-prefix $conda_folder --configfile ${pipeline_folder}/data/validation_datasets/config.yml -j 2 phylogeny/freebayes_joint_genotyping/cgMLST/bwa/phylogeny_no_st.svg typing/freebayes_joint_genotyping/cgMLST/bwa/distances_in_snp_mst_no_st.svg --config sra_samples="sras.tsv" species="Clostridioides_difficile" 
       - persist_to_workspace:
           root: /home/pipeline_user/
           paths:
