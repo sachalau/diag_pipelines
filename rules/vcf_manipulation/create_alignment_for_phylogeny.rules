@@ -53,5 +53,5 @@ rule concatenate_consensus_fasta_files_all_samples:
         alignment="typing/{snp_caller}/full_genome_{reference}/{mapping_method}/alignment.fa"
     shell:
         """
-        sed "s/^>.*/>{reference}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
+        sed "s/^>.*/>{wildcards.reference}/" {input[ref]} | cat {input[fasta]} - > {output[alignment]}
         """
