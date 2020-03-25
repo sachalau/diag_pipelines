@@ -1,0 +1,5 @@
+channels:
+ - bioconda
+ - conda-forge
+dependencies:
+ - snpEff = 4.3
