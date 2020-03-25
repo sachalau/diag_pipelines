@@ -12,6 +12,18 @@ RUN conda install snpEff=4.3
 
 RUN conda install entrez-direct=7.70
 
+RUN conda install bcftools=1.8
+
+RUN conda install bwa=0.7.17
+
+RUN conda install samtools=1.7
+
+RUN conda install gatk4=4.0.2.0
+
+RUN conda install trimmomatic=0.36
+
+RUN pip install bcbio-gff
+
 ENV main=/home/pipeline_user
 
 ENV pipeline_folder=${main}/snakemake_pipeline

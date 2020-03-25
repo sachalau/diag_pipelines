@@ -23,3 +23,28 @@ rule index_bam_file:
         """
         samtools index {input[0]}
         """
+
+rule convert_bam_to_cram:
+    conda:
+        pipeline_path + "envs/bwa-samtools.yml"
+    input:
+        ref = "references/{ref}/genome_fasta.fasta",
+        bam = "samples/{sample}/mapping/{mapping_method}/{ref}_{any_bam}.bam",
+    output:
+        cram = temp("samples/{sample}/mapping/{mapping_method}/{ref}_{any_bam}.cram"),
+    shell:
+        """
+        samtools view -C --reference {input[ref]} {input[bam]} > {output[cram]}
+        """
+
+rule index_cram_file:
+    conda:
+        "../../envs/bwa-samtools.yml"
+    input:
+        "{any_bam}.cram"
+    output:
+        temp("{any_bam}.cram.crai"),
+    shell:
+        """
+        samtools index {input[0]}
+        """

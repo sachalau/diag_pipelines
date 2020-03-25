@@ -1,26 +1,13 @@
 rule copy_fastq_paired_from_link:
     input:
-        lambda wildcards: expand(link_directory + original_names[wildcards.sample] + "_{ext}", ext=read_naming[wildcards.sample])
+        R1="reads/ENA/{sample}_1.fastq.gz",
+        R2="reads/ENA/{sample}_2.fastq.gz",
     output:
         temp("samples/{sample}/reads/raw/{sample}_R1.fastq.gz"),
         temp("samples/{sample}/reads/raw/{sample}_R2.fastq.gz")
     shell:
         """
-        gzip -t {input[0]}
-        gzip -t {input[1]}
         cp {input[0]} {output[0]}
         cp {input[1]} {output[1]}
         """
-        
-rule copy_fastq_single_from_link:
-    input:
-        lambda wildcards: link_directory + original_names[wildcards.sample]+ "." +read_naming[wildcards.sample][0]
-    output:
-        temp("samples/{sample}/reads/raw/{sample}_single.fastq.gz")
-    shell:
-        """
-        gzip -t {input[0]}
-        cp {input[0]} {output[0]}
-        """
-        
         

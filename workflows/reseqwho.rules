@@ -3,8 +3,34 @@ try:
 except NameError:
     pipeline_path = workflow.basedir + "/../"
 
+
+logging_folder="logs/"
+    
 include:
     pipeline_path + "rules/downloading/fetch_single_reference.rules"
+    
+include:
+    pipeline_path + "rules/read_manipulation/get_sras.rules"
 
 include:
+    pipeline_path + "rules/read_manipulation/get_reads.rules"
+
+include:
+    pipeline_path + "rules/quality/trimmomatic.rules"
+    
+include:
+    pipeline_path + "rules/mapping/bwa.rules"
+
+include:
+    pipeline_path + "rules/mapping/indexing_files.rules"
+
+include:
+    pipeline_path + "rules/genotyping/gatk.rules"
+
+include:
+    pipeline_path + "rules/vcf_manipulation/indexing.rules"
+ 
+include:
     pipeline_path + "rules/annotation/snpEff.rules"
+
+

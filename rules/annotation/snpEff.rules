@@ -12,7 +12,7 @@ rule create_snpEff_config_file:
 
 rule link_files_for_snpEff_config:
     input:
-        annotation = "references/{reference}/genome.gff",
+        annotation = "references/{reference}/genome_fixed.gff",
         genome = "references/{reference}/genome_fasta.fasta",
     output:
         refseq = "references/{reference}/snpEff/data/{reference}/genes.gff",
@@ -22,6 +22,26 @@ rule link_files_for_snpEff_config:
         cp {input[annotation]} {output[refseq]}
         cp {input[genome]} {output[sequences]}
         """
+
+
+rule fix_gff_for_snpEff:
+    input:
+        gff = "{any_gff}.gff",
+    output:
+        gff_fixed = "{any_gff}_fixed.gff",
+    run:
+        from BCBio import GFF
+        import Bio
+        from Bio import SeqIO
+        gff = GFF.parse(open(input["gff"]))
+        for record in gff:
+            for features in record.features:
+                if features.type=="pseudogene":
+                    if "gene" not in features.qualifiers:
+                        features.qualifiers["gene"]=features.qualifiers["locus_tag"]
+        GFF.write([record], open(output["gff_fixed"], "w"))
+    
+
         
 rule create_snpEff_database:
     conda:
@@ -43,13 +63,14 @@ rule annotate_vcf_with_snpEff:
     conda:
         pipeline_path + "envs/snpEff.yml"
     input:
-        vcf = "samples/{sample}/{any_vcf}.vcf",
+        vcf = "samples/{sample}/snps/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}.vcf")
         predictor_bin = "references/{reference}/snpEff/data/{reference}/snpEffectPredictor.bin",
+        config_file = "references/{reference}/snpEff/snpEff.config",
     output:
-        annotated_vcf = temp("samples/{sample,[^/]+}/{any_vcf}_snpEff_{reference}.vcf")
+        annotated_vcf = temp("samples/{sample,[^/]+}/snps/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}_snpEff_{reference}.vcf")
     shell:
         """
-        snpEff ann -upDownStreamLen 2000 -noStats -config {input[predictor_bin]} -nodownload -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {wildcards.reference} {input[vcf]} > {output[annotated_vcf]}
+        snpEff ann -upDownStreamLen 2000 -noStats -config {input[config_file]} -nodownload -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {wildcards.reference} {input[vcf]} > {output[annotated_vcf]}
         """
 
         

@@ -35,13 +35,13 @@ rule genotype_with_HaplotypeCaller_GATK_BP_RESOLUTION:
     conda:
         pipeline_path + "envs/gatk.yml"
     input:
-        bam = "samples/{sample}/mapping/{mapping_method}/{ref}_deduplicated.cram",
-        bam_bai = "samples/{sample}/mapping/{mapping_method}/{ref}_deduplicated.cram.crai",
+        bam = "samples/{sample}/mapping/{mapping_method}/{ref}/{any_cram}.bam",
+        bam_bai = "samples/{sample}/mapping/{mapping_method}/{ref}/{any_cram}.bam.bai",
         ref = "references/{ref}/genome_fasta.fasta",
         ref_dict = "references/{ref}/genome_fasta.dict",
     output:
-        gvcf = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/snps.vcf"),
-        gvcf_index = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/snps.vcf.idx"),
+        gvcf = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/{any_cram}/snps.vcf"),
+        gvcf_index = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/{any_cram}/snps.vcf.idx"),
     log:
         logging_folder + "samples/{sample}/logs/snps/gatk/haplotypecaller_gvcf.txt",
     shell:
@@ -50,56 +50,3 @@ rule genotype_with_HaplotypeCaller_GATK_BP_RESOLUTION:
         """
 
         
-rule merge_gvcf_files_with_GenomicsDBImport_GATK:
-    conda:
-        pipeline_path + "envs/gatk.yml"
-    input:
-        ref = "references/{ref}/genome_fasta.fasta",
-        gvcfs = expand("samples/{sample}/snps/gatk/{{ref}}/{{mapping_method}}/snps.g.vcf.gz", sample=read_naming.keys()),
-        gvcfs_tbi = expand("samples/{sample}/snps/gatk/{{ref}}/{{mapping_method}}/snps.g.vcf.gz.tbi", sample=read_naming.keys())
-    output:
-        header = "typing/gatk_gvcfs/full_genome_{ref}/{mapping_method}/genomics_db/vcfheader.vcf"
-    log:
-        logging_folder + "gatk_gvcfs/full_genome_{ref}/{mapping_method}/merge_gvcf.txt",
-    shell:
-        """
-        if [ -d $(dirname {output[0]}) ]; then
-            rm -rf $(dirname {output[0]})
-        fi
-        acc=$(grep ">" {input[ref]} | sed "s/ .*//" | sed "s/>/--intervals /g")
-        var=$(echo {input[gvcfs]} | sed "s/ / --variant /g")
-        gatk-launch GenomicsDBImport --genomicsdb-workspace-path  $(dirname {output[header]}) --variant ${{var}} ${{acc}} &> {log}
-        """
-
-rule merge_gvcf_files_with_CombineGVCFs_GATK:
-    conda:
-        pipeline_path + "envs/gatk.yml"
-    input:
-        ref = "references/{ref}/genome_fasta.fasta",
-        gvcfs = expand("samples/{sample}/snps/gatk/{{ref}}/{{mapping_method}}/snps.g.vcf.gz", sample=read_naming.keys()),
-        gvcfs_tbi = expand("samples/{sample}/snps/gatk/{{ref}}/{{mapping_method}}/snps.g.vcf.gz.tbi", sample=read_naming.keys())
-    output:
-        combined = "typing/gatk_gvcfs/full_genome_{ref}/{mapping_method}/combined.vcf"
-    log:
-        logging_folder + "gatk_gvcfs/full_genome_{ref}/{mapping_method}/merge_gvcf.txt",
-    shell:
-        """
-        var=$(echo {input[gvcfs]} | sed "s/ / --variant /g")
-        gatk-launch CombineGVCFs --output {output[combined]} --variant ${{var}} --reference {input[ref]} &> {log}
-        """
-
-rule genotype_with_GenotypeGVCFs_GATK:
-    conda:
-        pipeline_path + "envs/gatk.yml"
-    input:
-        ref = "references/{ref}/genome_fasta.fasta",
-        combined = "typing/gatk_gvcfs/full_genome_{ref}/{mapping_method}/combined.vcf",
-        quality = "quality/multiqc/mapping_to_{ref}/{mapping_method}/multiqc_report.html",
-    output:
-        raw = "typing/gatk_gvcfs/full_genome_{ref}/{mapping_method}/raw/all_samples.vcf",
-    log:
-        logging_folder + "gatk_gvcfs/full_genome_{ref}/{mapping_method}/genotype_gvcf.txt",
-    shell:
-        """
-        gatk-launch GenotypeGVCFs --use-new-qual-calculator --sample-ploidy 1 --reference {input[ref]} --annotations-to-exclude InbreedingCoeff --variant {input[combined]} --output {output[raw]} &> {log}
-        """
