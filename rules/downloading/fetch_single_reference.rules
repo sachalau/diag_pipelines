@@ -54,5 +54,5 @@ rule download_gff_for_reference_from_nucleotide:
         gff="references/NC{accession}/genome.gff"
     shell:
         """
-        wget -O {output[gff]} "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&report=gff3&id=NC{wildcareds.accession}"
+        wget -O {output[gff]} "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&report=gff3&id=NC{wildcards.accession}"
         """

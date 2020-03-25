@@ -1,15 +1,58 @@
+rule create_snpEff_config_file:
+    output:
+        config_file = "references/{reference}/snpEff/snpEff.config",
+    shell:
+        """
+        echo "codon.Bacterial_and_Plant_Plastid : TTT/F, TTC/F, TTA/L, TTG/L+, TCT/S, TCC/S, TCA/S, TCG/S, TAT/Y, TAC/Y, TAA/*, TAG/*, TGT/C, TGC/C, TGA/*, TGG/W, CTT/L, CTC/L, CTA/L, CTG/L+, CCT/P, CCC/P, CCA/P, CCG/P, CAT/H, CAC/H, CAA/Q, CAG/Q, CGT/R, CGC/R, CGA/R, CGG/R, ATT/I+, ATC/I+, ATA/I+, ATG/M+, ACT/T, ACC/T, ACA/T, ACG/T, AAT/N, AAC/N, AAA/K, AAG/K, AGT/S, AGC/S, AGA/R, AGG/R, GTT/V, GTC/V, GTA/V, GTG/V+, GCT/A, GCC/A, GCA/A, GCG/A, GAT/D, GAC/D, GAA/E, GAG/E, GGT/G, GGC/G, GGA/G, GGG/G" > {output[config_file]}
+        echo "{wildcards.reference}.genome: H37Rv" >> {output[config_file]}
+        echo "{wildcards.reference}.chromosomes: {wildcards.reference}" >> {output[config_file]}
+        echo "{wildcards.reference}.{wildcards.reference}.codonTable: Bacterial_and_Plant_Plastid" >> {output[config_file]}
+        """
+
+
+rule link_files_for_snpEff_config:
+    input:
+        annotation = "references/{reference}/genome.gff",
+        genome = "references/{reference}/genome_fasta.fasta",
+    output:
+        refseq = "references/{reference}/snpEff/data/{reference}/genes.gff",
+        sequences = "references/{reference}/snpEff/data/{reference}/sequences.fa",
+    shell:
+        """
+        cp {input[annotation]} {output[refseq]}
+        cp {input[genome]} {output[sequences]}
+        """
+        
+rule create_snpEff_database:
+    conda:
+        pipeline_path + "envs/snpEff.yml"
+    input:
+        gff = "references/{reference}/snpEff/data/{reference}/genes.gff",
+        sequences = "references/{reference}/snpEff/data/{reference}/sequences.fa",
+        config_file = "references/{reference}/snpEff/snpEff.config",
+    output:
+        predictor_bin = "references/{reference}/snpEff/data/{reference}/snpEffectPredictor.bin",
+    shell:
+        """
+        snpEff build -gff3 -config {input[config_file]} {wildcards.reference}
+        """
+        
+        
+
 rule annotate_vcf_with_snpEff:
     conda:
         pipeline_path + "envs/snpEff.yml"
     input:
-        vcf = "samples/{sample}/{any_vcf}.vcf"
+        vcf = "samples/{sample}/{any_vcf}.vcf",
+        predictor_bin = "references/{reference}/snpEff/data/{reference}/snpEffectPredictor.bin",
     output:
-        annotated_vcf = temp("samples/{sample,[^/]+}/{any_vcf}_snpEff.vcf")
+        annotated_vcf = temp("samples/{sample,[^/]+}/{any_vcf}_snpEff_{reference}.vcf")
     shell:
         """
-        snpEff ann Mycobacterium_tuberculosis_gff -upDownStreamLen 200 -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {input[vcf]} > {output[annotated_vcf]}
+        snpEff ann -upDownStreamLen 2000 -noStats -config {input[predictor_bin]} -nodownload -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {wildcards.reference} {input[vcf]} > {output[annotated_vcf]}
         """
 
+        
 rule split_vcf:
     conda:
         pipeline_path + "envs/snpEff.yml",
