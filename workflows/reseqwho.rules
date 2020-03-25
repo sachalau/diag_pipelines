@@ -3,5 +3,8 @@ try:
 except NameError:
     pipeline_path = workflow.basedir + "/../"
 
-include :
+include:
     pipeline_path + "rules/downloading/fetch_single_reference.rules"
+
+include:
+    pipeline_path + "rules/annotation/snpEff.rules"
