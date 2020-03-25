@@ -18,10 +18,8 @@ RUN mkdir /opt/conda/envs/
 
 ENV conda_folder=/opt/conda/envs/
 
-RUN mkdir /home/pipeline_user/
-
 USER pipeline_user
 
 WORKDIR /home/pipeline_user/
 
-
+RUN snakemake --snakefile ${pipeline_folder}/workflows/full_pipeline.rules --config --use-conda --conda-prefix ${conda_folder} references/538048/genome_gbwithparts.gbk
