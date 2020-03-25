@@ -1,0 +1,2 @@
+include :
+    pipeline_path + "rules/downloading/fetch_single_reference.rules"
