@@ -12,7 +12,7 @@ ENV main=/home/pipeline_user
 
 ENV pipeline_folder=${main}/snakemake_pipeline
 
-RUN git clone https://github.com/metagenlab/diag_pipelines $pipeline_folder
+RUN git clone https://github.com/metagenlab/diag_pipelines --branch ReSeqWho $pipeline_folder
 
 RUN mkdir /opt/conda/envs/
 
