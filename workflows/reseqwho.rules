@@ -1,2 +1,7 @@
+try:
+    pipeline_path 
+except NameError:
+    pipeline_path = workflow.basedir + "/../"
+
 include :
     pipeline_path + "rules/downloading/fetch_single_reference.rules"
