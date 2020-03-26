@@ -6,13 +6,5 @@ rule download_sra_paired_from_ENA:
         "logs/samples/{sample}/sras/dump.txt"
     shell:
         """
-        R1=$(wget -qO- "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession={wildcards.sample}&result=read_run&fields=fastq_ftp" | tail -n 1 | cut -f1 -d';')
-        R2=$(wget -qO- "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession={wildcards.sample}&result=read_run&fields=fastq_ftp" | tail -n 1 | cut -f2 -d';')
-        wget -qO- ftp://$R1 > {output[R1]}
-        sleep 5s
-        wget -qO- ftp://$R2 > {output[R2]}
+        fastq-dump --split-files --gzip --outdir $(dirname {output[0]}) --log-level 0 --disable-multithreading --minReadLen 0 {wildcards.sample}
         """
-
-
-
-
