@@ -8,9 +8,7 @@ RUN conda install snakemake=5.0.0
 
 RUN pip install bcbio-gff biopython
 
-ENV main=/home/pipeline_user
-
-ENV pipeline_folder=${main}/snakemake_pipeline
+ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline
 
 RUN git clone https://github.com/sachalau/diag_pipelines --branch ReSeqWho $pipeline_folder
 
@@ -30,6 +28,6 @@ RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfi
 
 RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin references/NC_000962.3/genome_fasta.fasta.fai references/NC_000962.3/genome_fasta.fasta.bwt references/NC_000962.3/genome_fasta.dict
 
-RUN chown -R pipeline_user ${main}/
+RUN chown -R pipeline_user /home/pipeline_user/
 
 USER pipeline_user
