@@ -76,7 +76,7 @@ rule annotate_vcf_with_snpEff:
         
 rule split_vcf:
     conda:
-        pipeline_path + "envs/snpEff.yml",
+        pipeline_path + "envs/bcftools.yml",
     input:
         vcf = "{any_vcf}.vcf",
     output:
