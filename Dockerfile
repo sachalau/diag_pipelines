@@ -32,4 +32,6 @@ RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfi
 
 RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin
 
+RUN chown -R pipeline_user ${main}/
+
 USER pipeline_user
