@@ -4,29 +4,15 @@ RUN conda config --add channels defaults && conda config --add channels conda-fo
 
 RUN useradd -r -u 1080 pipeline_user
 
-RUN apt-get install -y fontconfig
-
 RUN conda install snakemake=5.0.0
 
-RUN conda install snpEff=4.3
-
-RUN conda install entrez-direct=7.70
-
-RUN conda install bcftools=1.8
-
-RUN conda install bwa=0.7.17
-
-RUN conda install samtools=1.7
-
-RUN conda install gatk4=4.0.2.0
-
-RUN conda install trimmomatic=0.36
-
-RUN pip install bcbio-gff
+RUN pip install bcbio-gff biopython
 
 ENV main=/home/pipeline_user
 
 ENV pipeline_folder=${main}/snakemake_pipeline
+
+RUN ls
 
 RUN git clone https://github.com/sachalau/diag_pipelines --branch ReSeqWho $pipeline_folder
 
@@ -42,5 +28,8 @@ RUN mv snakemake_pipeline/example_sra_samples.tsv .
 
 RUN mkdir links
 
-RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin
+RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --create-envs-only --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin samples/SRR000/snps/gatk/NC_000962.3/bwa/raw_deduplicated/snps_split_snpEff.vcf.gz
 
+RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin
+
+USER pipeline_user
