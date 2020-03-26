@@ -28,7 +28,7 @@ RUN mkdir links
 
 RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --create-envs-only --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin samples/SRR000/snps/gatk/NC_000962.3/bwa/raw_deduplicated/snps_split_snpEff.vcf.gz
 
-RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin references/NC_000962.3/genomes_fasta.fasta.fai references/NC_000962.3/genomes_fasta.fasta.bwt references/NC_000962.3/genomes_fasta.fasta.dict
+RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin references/NC_000962.3/genome_fasta.fasta.fai references/NC_000962.3/genome_fasta.fasta.bwt references/NC_000962.3/genome_fasta.fasta.dict
 
 RUN chown -R pipeline_user ${main}/
 
