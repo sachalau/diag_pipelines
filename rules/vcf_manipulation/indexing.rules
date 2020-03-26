@@ -4,7 +4,7 @@ rule compress_vcf:
     input:
         "{any_vcf}.{vcf_or_bed}",
     output:
-        temp("{any_vcf}.{vcf_or_bed, (vcf|bed)}.gz"),
+        "{any_vcf}.{vcf_or_bed, (vcf|bed)}.gz",
     shell:
         """
         bgzip -c {input[0]} > {output[0]}

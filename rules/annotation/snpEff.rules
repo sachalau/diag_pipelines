@@ -63,11 +63,11 @@ rule annotate_vcf_with_snpEff:
     conda:
         pipeline_path + "envs/snpEff.yml"
     input:
-        vcf = "samples/{sample}/snps/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}.vcf")
+        vcf = "samples/{sample}/snps/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}.vcf",
         predictor_bin = "references/{reference}/snpEff/data/{reference}/snpEffectPredictor.bin",
         config_file = "references/{reference}/snpEff/snpEff.config",
     output:
-        annotated_vcf = temp("samples/{sample,[^/]+}/snps/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}_snpEff_{reference}.vcf")
+        annotated_vcf = temp("samples/{sample,[^/]+}/snps/{any_genotyper,[^/]+}/{reference}/{any_mapper,[^/]+}/{any_vcf,[^/]+}_snpEff.vcf")
     shell:
         """
         snpEff ann -upDownStreamLen 2000 -noStats -config {input[config_file]} -nodownload -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {wildcards.reference} {input[vcf]} > {output[annotated_vcf]}
