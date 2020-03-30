@@ -4,7 +4,7 @@ RUN conda config --add channels defaults && conda config --add channels conda-fo
 
 RUN useradd -r -u 1080 pipeline_user
 
-RUN conda install snakemake=5.0.0 sra-tools=2.10
+RUN conda install sra-tools=2.10 snakemake=5.0.0
 
 RUN vdb-config --report-cloud-identity yes
 
