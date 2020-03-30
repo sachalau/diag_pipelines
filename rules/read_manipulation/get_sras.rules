@@ -16,3 +16,17 @@ rule download_sra_paired_from_ENA:
 
 
 
+rule download_sra_paired_from_ENA:
+    output:
+        R1=temp("reads/SRA/{sample,[A-Za-z0-9]+}_1.fastq"),
+        R2=temp("reads/SRA/{sample,[A-Za-z0-9]+}_2.fastq"),
+    log:
+        "logs/samples/{sample}/sras/dump.txt"
+    shell:
+        """
+        fasterq-dump --outdir $(dirname {output[0]}) --log-level 0 --disable-multithreading --minReadLen 0 {wildcards.sample}
+        """
+
+
+
+
