@@ -13,24 +13,6 @@ rule create_dictionary_for_reference:
         gatk-launch CreateSequenceDictionary --REFERENCE {input[ref]} &> {log}
         """
         
-#rule genotype_with_HaplotypeCaller_GATK_BP_RESOLUTION:
-#    conda:
-#        pipeline_path + "envs/gatk.yml"
-#    input:
-#        bam = "samples/{sample}/mapping/{mapping_method}/{ref}_deduplicated_filtered.bam",
-#        bam_bai = "samples/{sample}/mapping/{mapping_method}/{ref}_deduplicated_filtered.bam.bai",
-#        ref = "references/{ref}/genome_fasta.fasta",
-#        ref_dict = "references/{ref}/genome_fasta.dict",
-#    output:
-#        gvcf = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/snps.g.vcf"),
-#        gvcf_index = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/snps.g.vcf.idx"),
-#    log:
-#        logging_folder + "samples/{sample}/logs/snps/gatk/haplotypecaller_gvcf.txt",
-#    shell:
-#        """
-#        gatk-launch HaplotypeCaller --sample-ploidy 2 --output {output[gvcf]} --input {input[bam]} --reference {input[ref]} -ERC BP_RESOLUTION &> {log[0]}
-#        """
-        
 rule genotype_with_HaplotypeCaller_GATK_BP_RESOLUTION:
     conda:
         pipeline_path + "envs/gatk.yml"
@@ -40,8 +22,8 @@ rule genotype_with_HaplotypeCaller_GATK_BP_RESOLUTION:
         ref = "references/{ref}/genome_fasta.fasta",
         ref_dict = "references/{ref}/genome_fasta.dict",
     output:
-        gvcf = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/{any_cram}/snps.vcf"),
-        gvcf_index = temp("samples/{sample}/snps/gatk/{ref}/{mapping_method}/{any_cram}/snps.vcf.idx"),
+        gvcf = temp("samples/{sample}/genotyping/gatk/{ref}/{mapping_method}/{any_cram}/snps.vcf"),
+        gvcf_index = temp("samples/{sample}/genotyping/gatk/{ref}/{mapping_method}/{any_cram}/snps.vcf.idx"),
     log:
         logging_folder + "samples/{sample}/logs/snps/gatk/haplotypecaller_gvcf.txt",
     shell:

@@ -1,0 +1,18 @@
+rule genotype_with_bcftools_call:
+    """
+    Replaces the samtools mpileup + bcftools call part in UVP.
+    Changes: Tags used in samtools mpileup are now deprecated (DV,DPR->AD)
+    """
+    conda:
+        pipeline_path + "envs/bcftools.yml"
+    input:
+        bam = "samples/{sample}/mapping/{mapping_method}/{ref}/{any_cram}.bam",
+        bam_bai = "samples/{sample}/mapping/{mapping_method}/{ref}/{any_cram}.bam.bai",
+        reference = "references/{ref}/genome_fasta.fasta",
+        reference_index = "references/{ref}/genome_fasta.fai",
+    output:
+        vcf = temp("samples/{sample}/genotyping/bcftools/{ref}/{mapping_method}/{any_cram}/snps.vcf"),
+    shell:
+        """
+        bcftools mpileup --min-BQ 20 --min-MQ 20 --annotate DP,AD --output-type u --fasta-ref {input[reference]}  {input[bam]} | bcftools call --output-type v --format-fields GQ --consensus-caller > {output[vcf]}
+        """
