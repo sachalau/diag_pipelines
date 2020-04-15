@@ -28,6 +28,9 @@ include:
     pipeline_path + "rules/genotyping/gatk.rules"
 
 include:
+    pipeline_path + "rules/genotyping/freebayes.rules",
+    
+include:
     pipeline_path + "rules/vcf_manipulation/indexing.rules"
  
 include:
