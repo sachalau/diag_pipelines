@@ -1,23 +1,3 @@
-rule genotype_with_freebayes_on_all_samples:
-    conda:        
-        pipeline_path + "envs/freebayes.yml"
-    threads:
-        16
-    input:
-        bams=expand("samples/{sample}/mapping/{{mapping_method}}/{{ref}}_deduplicated_filtered.bam", sample=read_naming.keys()),
-        bais=expand("samples/{sample}/mapping/{{mapping_method}}/{{ref}}_deduplicated_filtered.bam.bai", sample=read_naming.keys()),
-        ref="references/{ref}/genome_fasta.fasta",
-        ref_fai="references/{ref}/genome_fasta.fasta.fai",
-        quality = "quality/multiqc/mapping_to_{ref}/{mapping_method}/multiqc_report.html",
-    output:
-        vcf="typing/freebayes_joint_genotyping/full_genome_{ref}/{mapping_method}/raw/all_samples.vcf"
-    log:
-        logging_folder+"freebayes_joint_genotyping/all_samples.txt"
-    shell:
-        """
-        freebayes-parallel <(fasta_generate_regions.py {input[ref_fai]} 100000) {threads} --ploidy 1 --min-base-quality 20 --genotype-qualities --fasta-reference {input[ref]} --haplotype-length -1 {input[bams]}  > {output[vcf]} 2> {log}
-        """
-
 
 rule genotype_with_freebayes_one_sample_second_pass:
     conda:
@@ -37,3 +17,23 @@ rule genotype_with_freebayes_one_sample_second_pass:
         """
         freebayes --ploidy 1 --min-base-quality 20 --genotype-qualities --fasta-reference {input[ref]} --haplotype-length -1 --variant-input {input[variants]} --vcf {output[vcf]} {input[bam]} 2> {log}
         """
+
+
+        
+rule genotype_with_freebayes:
+    conda:
+        pipeline_path + "envs/freebayes.yml"
+    input:
+        bam = "samples/{sample}/mapping/{mapping_method}/{ref}/{any_mapping}.bam",
+        bai = "samples/{sample}/mapping/{mapping_method}/{ref}/{any_mapping}.bam.bai", 
+        ref = "references/{ref}/genome_fasta.fasta",
+        ref_fai = "references/{ref}/genome_fasta.fasta.fai",
+    output:
+        vcf = temp("samples/{sample}/genotyping/freebayes/{ref,[^/]+}/{mapping_method,[^/]+}/{any_mapping,[^/]+}/snps.vcf")
+    shell:
+        """
+        freebayes --ploidy 1 --min-base-quality 20 --genotype-qualities --fasta-reference {input[ref]} --haplotype-length 50  --vcf {output[vcf]} {input[bam]}
+        """
+
+
+        
