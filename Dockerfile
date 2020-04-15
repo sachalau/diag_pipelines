@@ -6,7 +6,7 @@ RUN useradd -r -u 1080 pipeline_user
 
 RUN apt -y update
 
-RUN apt -y install  awscli
+RUN apt -y install awscli
 
 RUN conda install sra-tools=2.10 snakemake=5.0.0
 
@@ -14,7 +14,7 @@ RUN vdb-config --report-cloud-identity yes
 
 RUN pip install bcbio-gff biopython
 
-ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline///
+ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline/
 
 RUN git clone https://github.com/sachalau/diag_pipelines --branch ReSeqWho $pipeline_folder
 
@@ -30,10 +30,17 @@ RUN mv snakemake_pipeline/example_sra_samples.tsv .
 
 RUN mkdir links
 
-RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --create-envs-only --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin samples/SRR000/genotyping/gatk/NC_000962.3/bwa/raw_deduplicated/snps_split_snpEff.vcf.gz
+RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --create-envs-only --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin samples/SRR000/genotyping/gatk/NC_000962.3/bwa/raw_deduplicated/snps_split_snpEff.vcf.gz samples/SRR000/genotyping/freebayes/NC_000962.3/bwa/raw_deduplicated/snps_split_snpEff.vcf.gz
 
 RUN snakemake --snakefile ${pipeline_folder}/workflows/reseqwho.rules --configfile ${pipeline_folder}/config.yml --use-conda --conda-prefix ${conda_folder} references/NC_000962.3/snpEff/data/NC_000962.3/snpEffectPredictor.bin references/NC_000962.3/genome_fasta.fasta.fai references/NC_000962.3/genome_fasta.fasta.bwt references/NC_000962.3/genome_fasta.dict
 
 RUN chown -R pipeline_user /home/pipeline_user/
 
 USER pipeline_user
+
+ADD fetch_and_run.sh /home/pipeline_user/fetch_and_run.sh
+
+ENTRYPOINT ["/home/pipeline_user/fetch_and_run.sh"]
+
+
+
