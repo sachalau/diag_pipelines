@@ -83,7 +83,7 @@ install -m 0600 /dev/null "${TMPFILE}" || error_exit "Failed to create temp file
 # Fetch and run a script
 fetch_and_run_script () {
   # Create a temporary file and download the script
-  aws s3 cp "${BATCH_FILE_S3_URL}" "${TMPFILE}"
+  aws s3 cp "${BATCH_FILE_S3_URL}" - > "${TMPFILE}" || error_exit "Failed to download S3 script."
 
   # Make the temporary file executable and run it with any given arguments
   local script="./${1}"; shift

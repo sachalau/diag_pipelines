@@ -6,7 +6,15 @@ RUN useradd -r -u 1080 pipeline_user
 
 RUN apt -y update
 
-RUN apt -y install awscli unzip
+RUN apt install unzip
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+RUN unzip awscliv2.zip
+
+RUN ./aws/install
+
+RUN rm -rf aws*
 
 RUN conda install sra-tools=2.10 snakemake=5.0.0
 
