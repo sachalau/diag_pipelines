@@ -4,6 +4,10 @@ RUN conda config --add channels defaults && conda config --add channels conda-fo
 
 RUN useradd -r -u 1080 pipeline_user
 
+RUN apt -y update
+
+RUN apt -y install  awscli
+
 RUN conda install sra-tools=2.10 snakemake=5.0.0
 
 RUN vdb-config --report-cloud-identity yes
