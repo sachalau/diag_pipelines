@@ -224,6 +224,13 @@ rule extract_annotation_for_protein_change:
                 "sep": "_"
             }
         }
+        regexp_incorrect_multi_delins={
+            "deletion_insertion":
+            {
+                "reg": r'^p\.(?:[A-z][a-z]{2}){2,}\d+(?:[A-Z][a-z]{2}){2,}$',
+                "sep": "\d+"
+            }
+        }
         final = pandas.DataFrame([])
         for annotation, values in regexp_simple_change.items():
             tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
@@ -287,6 +294,20 @@ rule extract_annotation_for_protein_change:
                 tmp["insertion_length"] = tmp["alt_AA"].str.len().divide(3)
                 tmp["end_pos"] = tmp["start_pos"]
                 tmp["end_AA"] = tmp["start_AA"]
+                final = pandas.concat([final, tmp])
+        for annotation, values in regexp_incorrect_multi_delins.items():
+            print(sum(snpEff["HGVS.p"].str.match(values["reg"], na=False)))
+            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
+            if not tmp.empty:
+                print(tmp)
+                tmp["type"] = annotation
+                tmp["start_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.split(pat=values["sep"], expand=True)[0].str[:3]
+                tmp["start_pos"] = tmp["HGVS.p"].str.extract("("+values["sep"]+")").astype(int)
+                tmp["alt_AA"] = tmp["HGVS.p"].str.split(pat=values["sep"], expand=True)[1]
+                tmp["insertion_length"] = tmp["alt_AA"].str.len().divide(3)
+                tmp["end_pos"] = tmp["start_pos"]-1+tmp["HGVS.p"].str.replace("p\.", "").str.split(pat=values["sep"], expand=True)[0].str.len().divide(3)
+                tmp["end_AA"] = tmp["HGVS.p"].str.replace("p\.", "").str.split(pat=values["sep"], expand=True)[0].str[-3:]
+                print(tmp)
                 final = pandas.concat([final, tmp])
         final["alt_AA"] = final["alt_AA"].str.replace("*", "Ter").str.replace("extTer\?", "")
         print(sum(final["type"].value_counts()))
