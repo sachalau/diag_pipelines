@@ -6,7 +6,7 @@ RUN useradd -r -u 1080 pipeline_user
 
 RUN apt -y update
 
-RUN apt -y install awscli
+RUN apt -y install awscli unzip
 
 RUN conda install sra-tools=2.10 snakemake=5.0.0
 
