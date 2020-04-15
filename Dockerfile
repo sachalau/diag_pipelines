@@ -22,7 +22,7 @@ RUN vdb-config --report-cloud-identity yes
 
 RUN pip install bcbio-gff biopython
 
-ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline///
+ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline/
 
 RUN git clone https://github.com/sachalau/diag_pipelines --branch ReSeqWho $pipeline_folder
 
