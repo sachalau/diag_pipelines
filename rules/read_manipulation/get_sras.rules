@@ -24,5 +24,6 @@ rule download_sra_paired_from_SRA:
         "logs/samples/{sample}/sras/dump.txt"
     shell:
         """
+        vdb-config --report-cloud-identity yes
         fasterq-dump --split-files --outdir $(dirname {output[0]}) --log-level 0 --min-read-len 0 {wildcards.sample}
         """
