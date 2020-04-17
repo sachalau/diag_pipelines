@@ -4,8 +4,8 @@ rule map_paired_reads_with_bwa:
     params:
         platform = "ILLUMINA"
     input:
-        fastq1 = "samples/{sample}/reads/trimmed/R1_paired.fastq",
-        fastq2 = "samples/{sample}/reads/trimmed/R2_paired.fastq",        
+        fastq1 = "reads/SRA/{sample}_1.fastq",
+        fastq2 = "reads/SRA/{sample}_2.fastq",        
         ref = "references/{ref}/genome_fasta.fasta",
         ref_index = "references/{ref}/genome_fasta.fasta.bwt",
     output:
