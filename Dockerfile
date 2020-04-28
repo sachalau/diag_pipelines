@@ -6,7 +6,7 @@ RUN useradd -r -u 1080 pipeline_user
 
 RUN apt -y update
 
-RUN apt install unzip postgreseql-server-dev-10
+RUN apt -y install unzip postgresql
 
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 
