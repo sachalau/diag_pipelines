@@ -1,0 +1,163 @@
+rule prepare_gff_for_db:
+    input:
+        gff = "{any_gff}.gff",
+    output:
+        genes = "{any_gff}_genes.tsv",
+        proteins = "{any_gff}_proteins.tsv",
+    run:
+        from BCBio import GFF
+        import psycopg2, pandas
+        gene_data = []
+        protein_data = []
+        gff = GFF.parse(open(input["gff"]))
+        for seq_record in gff:
+            for features in seq_record.features:
+                if features.type=="gene":
+                    if "gene_synonym" in features.qualifiers.keys():
+                        gene_data.append([features.location.start, features.location.end, features.location.strand, features.qualifiers["locus_tag"][0], features.qualifiers["Name"][0], features.qualifiers["gene_synonym"][0]])
+                    else:
+                        gene_data.append([features.location.start, features.location.end, features.location.strand, features.qualifiers["locus_tag"][0], features.qualifiers["Name"][0], ""])
+        limit_info=dict(
+            gff_source_type=[
+                ('RefSeq', 'CDS'), 
+            ],
+            gff_source=['RefSeq']
+        )
+        gff_protein = GFF.parse(open(input["gff"]), limit_info={'gff_source_type':[('RefSeq', 'CDS')], 'gff_source':['RefSeq']})
+        for seq_record in gff_protein:
+            for features in seq_record.features:
+                protein_data.append([features.qualifiers["Name"][0], features.qualifiers["locus_tag"][0], (features.location.end-features.location.start)/3-1])
+                    
+        pandas.DataFrame(gene_data).to_csv(output["genes"], sep="\t", header=False, index=False)
+        pandas.DataFrame(protein_data).to_csv(output["proteins"], sep="\t", header=False, index=False)
+
+
+rule load_annotation_into_db:
+    params:
+        host = config["db_host"],
+        user = config["db_user"],
+        db = config["db_name"],
+    input:
+        genes = "references/{reference}/genome_genes.tsv",
+        proteins = "references/{reference}/genome_proteins.tsv",
+    output:
+        loaded = "references/{reference}/genome_loaded.txt",
+    run:
+        import psycopg2, pandas
+        proteins = pandas.read_csv(input["proteins"], sep="\t", header=None, names=["NP", "LocusTag", "Length"])
+        conn = psycopg2.connect(host=params["host"], database=params["db"], user=params["user"])
+        curr = conn.cursor()
+        try:
+            curr.execute('INSERT INTO "Annotation"("Name") VALUES (%s) RETURNING "Id";', [wildcards["reference"]])
+            annotation_id = curr.fetchone()[0]
+            conn.commit()
+            for index, row in pandas.read_csv(input["genes"], sep="\t", header=None).fillna("").iterrows():
+                curr.execute('INSERT INTO "Gene"("Annotation", "Start", "End", "Direction", "LocusTag", "Name", "AlternativeName") VALUES(%s, %s, %s, %s, %s, %s, %s) RETURNING "Id";', [annotation_id] + list(row))
+                gene_id=curr.fetchone()[0]
+                prot=proteins.loc[proteins['LocusTag'] == row[3]]
+                if not prot.empty:
+                    curr.execute('INSERT INTO "Protein"("Name", "GeneId", "Length") VALUES(%s, %s, %s);', [prot["NP"].iloc[0]] + [gene_id] + [prot["Length"].iloc[0]])
+                conn.commit()
+            open(output["loaded"], "w").close()
+        except psycopg2.DatabaseError as error:
+            if error.pgcode == "23505":
+                conn.rollback()
+                open(output["loaded"], "w").close()
+            else:
+                print(error)
+
+            
+    
+
+        
+
+
+
+rule load_genotype_into_db:
+    input:
+        vcf_formated = "{any_vcf}_formated_genotype.tsv",
+        variants_loaded = "{any_vcf}_variant_loaded.txt",
+    output:
+        loaded = "{any_vcf}_genotype_loaded.txt",
+    run:
+        import psycopg2, pandas
+        conn = psycopg2.connect(host="localhost",database="ReSeqWHO", user="postgres", password="postgres")
+        curr = conn.cursor()
+        variants = pandas.read_csv(input["vcf_formated"], sep="\t", header=None, names=["Sample", "Chrom", "Pos", "Ref", "Alt", "QUAL", "AD", "DP", "Filter"])
+        variants[["ref_AD", "alt_AD"]] = variants["AD"].str.split(",", expand=True).astype(int)
+        for index, row in variants.iterrows():
+            curr.execute('SELECT "VariantId" FROM "Variant" WHERE "Chrom" = %s AND "Pos" = %s AND "RefNucl" = %s AND "AltNucl" = %s;', row[["Chrom", "Pos", "Ref", "Alt"]])
+            variant_id = curr.fetchone()[0]
+            try:
+                curr.execute('INSERT INTO "Genotype"("VariantId", "SequencedLibraryId", "QualValue", "RefAD", "AltAD", "TotalDP", "Filter") VALUES(%s, %s, %s, %s, %s, %s, %s);', [variant_id] + list(row[["Sample", "QUAL", "ref_AD", "alt_AD", "DP", "Filter"]]))
+                conn.commit()
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+                else:
+                    print(error)
+        curr.close()
+        open(output["loaded"], "w").close()
+
+
+        
+        
+rule load_variant_into_db:
+    input:
+        vcf_formated = "{any_vcf}_formated_variant.tsv",
+    output:
+        loaded = "{any_vcf}_variant_loaded.txt",
+    run:
+        import psycopg2, pandas
+        conn = psycopg2.connect(host="localhost",database="ReSeqWHO", user="postgres", password="postgres")
+        curr = conn.cursor()
+        variants = pandas.read_csv(input["vcf_formated"], sep="\t", header=None)
+        for index, row in variants.iterrows():
+            try:
+                curr.execute('INSERT INTO "Variant"("Chrom", "Pos", "RefNucl", "AltNucl") VALUES(%s, %s, %s, %s);', row)
+                conn.commit()
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+                else:
+                    print(error)
+        curr.close()
+        open(output["loaded"], "w").close()
+
+        
+        
+rule load_protein_change_into_db:
+    input:
+        substitution = "{any_vcf}_snpEff_formated_protein_change.tsv",
+        variants_loaded = "{any_vcf}_snpEff_variant_loaded.txt",
+        genotypes_loaded = "{any_vcf}_snpEff_genotype_loaded.txt",
+    output:
+        loaded = "{any_vcf}_snpEff_protein_change_loaded.txt",
+    run:
+        import psycopg2, pandas, numpy
+        conn = psycopg2.connect(host="localhost",database="ReSeqWHO", user="postgres", password="postgres")
+        curr = conn.cursor()
+        substitutions = pandas.read_csv(input["substitution"], sep="\t", header=0)
+        for index, row in substitutions.replace(numpy.nan, "").iterrows():
+            curr.execute('Select "ProteinId" FROM "Gene" NATURAL JOIN "Protein" WHERE "GeneId"=%s;', [row["Gene_ID"].replace("gene-", "")])
+            protein_id = curr.fetchone()[0]
+            curr.execute('SELECT "VariantId" FROM "Variant" WHERE "Chrom" = %s AND "Pos" = %s AND "RefNucl" = %s AND "AltNucl" = %s;', row[["Chrom", "Pos", "Ref", "Alt"]])
+            variant_id = curr.fetchone()[0]
+            curr.execute('SELECT "ProteinChangeId" FROM "ProteinChange" WHERE "ProteinId"=%s AND "Type"=%s AND "StartPos"=%s AND "EndPos"=%s AND "StartAA"=%s AND "EndAA"=%s AND "AltAA"=%s AND "InsertionLength"=%s;', [protein_id] + list(row[["type", "start_pos", "end_pos", "start_AA", "end_AA", "alt_AA", "insertion_length"]]))
+            annot_id = curr.fetchone()
+            if annot_id is None:
+                curr.execute('INSERT INTO "ProteinChange"("ProteinId", "Type", "StartPos", "EndPos", "StartAA", "EndAA", "AltAA", "InsertionLength") VALUES(%s, %s, %s, %s, %s, %s, %s, %s) RETURNING "ProteinChangeId";', [protein_id] + list(row[["type", "start_pos", "end_pos", "start_AA", "end_AA", "alt_AA", "insertion_length"]]))
+                annot_id = curr.fetchone()[0]
+                curr.execute('INSERT INTO "VariantToProteinChange"("VariantId", "ProteinChangeId") VALUES(%s, %s);', (variant_id, annot_id))
+                conn.commit()
+            else:
+                try:
+                    curr.execute('INSERT INTO "VariantToProteinChange"("VariantId", "ProteinChangeId") VALUES(%s, %s);', (variant_id, annot_id))
+                    conn.commit()
+                except psycopg2.DatabaseError as error:
+                    if error.pgcode == "23505":
+                        conn.rollback()
+                    else:
+                        print(error)
+        curr.close()
+        open(output["loaded"], "w").close()

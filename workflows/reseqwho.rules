@@ -35,5 +35,9 @@ include:
  
 include:
     pipeline_path + "rules/annotation/snpEff.rules"
+ 
+include:
+    pipeline_path + "rules/annotation/load_db.rules"
 
+    
 
