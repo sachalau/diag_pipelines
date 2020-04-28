@@ -6,7 +6,7 @@ RUN useradd -r -u 1080 pipeline_user
 
 RUN apt -y update
 
-RUN apt install unzip
+RUN apt install unzip postgreseql-server-dev-10
 
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 
@@ -18,7 +18,7 @@ RUN rm -rf aws*
 
 RUN conda --quiet install sra-tools=2.10 snakemake=5.0.0
 
-RUN pip install bcbio-gff biopython
+RUN pip install bcbio-gff biopython psycopg2
 
 ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline//
 
