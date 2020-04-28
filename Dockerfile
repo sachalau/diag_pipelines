@@ -16,7 +16,7 @@ RUN ./aws/install
 
 RUN rm -rf aws*
 
-RUN conda --quiet install sra-tools=2.10 snakemake=5.0.0
+RUN conda install --quiet sra-tools=2.10 snakemake=5.0.0
 
 RUN pip install bcbio-gff biopython psycopg2
 
