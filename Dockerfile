@@ -24,7 +24,7 @@ RUN rm -rf aws*
 
 RUN pip3 install bcbio-gff biopython psycopg2 snakemake
 
-ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline//
+ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline/
 
 RUN git clone https://github.com/sachalau/diag_pipelines --branch ReSeqWho $pipeline_folder
 
