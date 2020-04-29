@@ -17,6 +17,8 @@ rule download_sra_paired_from_ENA:
 
 
 rule download_sra_paired_from_SRA:
+    conda:
+        pipeline_path + "envs/sra-tools.yml"
     output:
         R1=temp("reads/SRA/{sample,[A-Za-z0-9]+}_1.fastq"),
         R2=temp("reads/SRA/{sample,[A-Za-z0-9]+}_2.fastq"),
