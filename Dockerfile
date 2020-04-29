@@ -22,7 +22,7 @@ RUN ./aws/install
 
 RUN rm -rf aws*
 
-RUN pip3 install bcbio-gff biopython psycopg2 snakemake
+RUN pip3 install bcbio-gff biopython psycopg2 snakemake pandas
 
 ENV pipeline_folder=/home/pipeline_user/snakemake_pipeline/
 
