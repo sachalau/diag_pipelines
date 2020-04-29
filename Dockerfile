@@ -46,4 +46,6 @@ RUN chown -R pipeline_user /home/pipeline_user/
 
 USER pipeline_user
 
-ENTRYPOINT ["/home/pipeline_user/snakemake_pipeline/workflows/reseqwho.rules"]
+ADD fetch_and_run.sh /home/pipeline_user/fetch_and_run.sh
+
+ENTRYPOINT ["/home/pipeline_user/fetch_and_run.sh"]
