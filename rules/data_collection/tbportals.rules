@@ -1,0 +1,195 @@
+rule download_data_from_tb_portals:
+    params:
+        host = config["db_host"],
+        user = config["db_user"],
+        db = config["db_name"],
+    input:
+        flag="db_created.txt",
+    output:
+        isolates = "data/tbportals/isolates.csv",
+        DST = "data/tbportals/DSTs.csv",
+        libraries = "data/tbportals/libraries.csv",
+    run:
+        from bs4 import BeautifulSoup as bs
+        from collections import OrderedDict
+        from dateutil import parser
+        from collections import defaultdict
+        import pandas, urllib3, re, psycopg2
+        
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        conn = psycopg2.connect(host=params["host"],database=params["db"], user=params["user"])
+        curr = conn.cursor()
+        mapping_drugs = {
+            "H": "Isoniazid",
+            "R": "Rifampicin",
+            "E": "Ethambutol",
+            "S": "Streptomycin",
+            "Ofx": "Ofloxacin",
+            "Cm": "Capreomycin",
+            "Am": "Amikacin",
+            "Km": "Kanamycin",
+            "Z": "Pyrazinamide",
+            "Lfx": "Levofloxacin",
+            "Mfx": "Moxifloxacin",
+            "Pas": "Para-Aminosalicylic Acid",
+            "Pto": "Prothionamide"
+        }
+        mapping_concentration = {
+            "Moxifloxacin": [None, 0.25, 0.5, 1, 2]
+        }
+        mapping_medium = {
+            "Bactec": "MGIT"
+        }
+        mapping_medium_type = {
+            "MGIT": "Liquid"
+        }
+        assays = defaultdict(dict)
+        for medium in list(mapping_medium.values()) + ["Lowenstein-Jensen"]:
+            curr.execute('SELECT "Id" FROM "Medium" WHERE "Name"=%s;', [medium])
+            try:
+                medium_id = curr.fetchone()[0]
+            except TypeError:
+                curr.execute('INSERT INTO "Medium" ("Name", "Type") VALUES (%s, %s) RETURNING "Id";', [medium, mapping_medium_type.get(medium, "Solid")])
+                conn.commit()
+                medium_id = curr.fetchone()[0]
+            for drug in mapping_drugs.values():
+                curr.execute('SELECT "Id" FROM "Drug" WHERE "Name"=%s;', [drug])
+                try:
+                    drug_id = curr.fetchone()[0]
+                except TypeError:
+                    curr.execute('INSERT INTO "Drug" ("Name") VALUES (%s) RETURNING "Id";', [drug])
+                    conn.commit()
+                    drug_id = curr.fetchone()[0]
+                if mapping_concentration.get(drug, False):
+                    assays[medium][drug] = {}
+                    for conc in mapping_concentration[drug]:
+                        if conc:
+                            curr.execute('SELECT "Id" FROM "PhenotypicDrugSusceptibilityAssay" WHERE "DrugId"=%s AND "MediumId"=%s AND "Concentration"=%s;', [drug_id, medium_id, conc])
+                            try:
+                                assay_id = curr.fetchone()[0]
+                            except TypeError:
+                                curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityAssay" ("DrugId", "MediumId", "Concentration") VALUES (%s, %s, %s) RETURNING "Id";', [drug_id, medium_id, conc])
+                                conn.commit()
+                                assay_id = curr.fetchone()[0]
+                        else:
+                            curr.execute('SELECT "Id" FROM "PhenotypicDrugSusceptibilityAssay" WHERE "DrugId"=%s AND "MediumId"=%s AND "Concentration" IS NULL', [drug_id, medium_id])
+                            try:
+                                assay_id = curr.fetchone()[0]
+                            except TypeError:
+                                curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityAssay" ("DrugId", "MediumId") VALUES (%s, %s) RETURNING "Id";', [drug_id, medium_id])
+                                conn.commit()
+                                assay_id = curr.fetchone()[0]
+                        assays[medium][drug][conc] = assay_id
+                else:
+                    curr.execute('SELECT "Id" FROM "PhenotypicDrugSusceptibilityAssay" WHERE "DrugId"=%s AND "MediumId"=%s AND "Concentration" IS NULL;', [drug_id, medium_id])
+                    try:
+                        assay_id = curr.fetchone()[0]
+                    except TypeError:
+                        curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityAssay" ("DrugId", "MediumId") VALUES (%s, %s) RETURNING "Id";', [drug_id, medium_id])
+                        conn.commit()
+                        assay_id = curr.fetchone()[0]
+                    assays[medium][drug] = assay_id
+        print(assays)
+        def extract_data(html):
+            dic={}
+            soup=bs(html, "html.parser")
+            for li in soup.find_all("li"):
+                if "Patient: " in li.get_text():
+                    patient="".join(li.get_text().replace("Patient:", "").split())
+            try:
+                curr.execute('INSERT INTO "Patient"("Name") VALUES (%s) RETURNING "Id";', ["NIAID_TBPortals_" + patient])
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+                    curr.execute('SELECT "Id" FROM "Patient" WHERE "Name"=%s;', ["NIAID_TBPortals_" + patient])
+                else:
+                    print(error)
+            patient_id = curr.fetchone()[0]
+            for h5 in soup.find_all("h5"):
+                if h5.get_text()=="Genomes":
+                    table = h5.find_next("table")
+                    values = table.find_next("tbody").findAll("tr")
+                    header = table.find_next("thead").findAll("th")
+                    l = [k.get_text() for k in header]
+                    for u in values:
+                        cells=u.findAll("td")
+                        v=[s.strip() for s in [k.get_text() for k in cells]]
+                        specimen_name = v[0]
+                        try:
+                            curr.execute('INSERT INTO "Specimen" ("Name", "SampledFrom") VALUES(%s, %s) RETURNING "Id";', ["NIAID_TBPortals_" + specimen_name, patient_id])
+                        except psycopg2.DatabaseError as error:
+                            if error.pgcode == "23505":
+                                conn.rollback()
+                                curr.execute('SELECT "Id" FROM "Specimen" WHERE "Name"=%s;', ["NIAID_TBPortals_" + specimen_name])
+                            else:
+                                print(error)
+                        specimen_id = curr.fetchone()[0]
+                        for i in range(1,8):
+                            if l[i]=="Sequence Read Archive":
+                                for sra in v[i].split(","):
+                                    try:
+                                        curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES(%s, %s);', [specimen_id, sra.strip()])
+                                    except psycopg2.DatabaseError as error:
+                                        if error.pgcode == "23505":
+                                            conn.rollback()
+                                        else:
+                                            print(error)
+                        conn.commit()
+                if h5.get_text()=="Drug susceptibility testing":
+                    table = h5.find_next("table")
+                    header = table.find_next("thead").findAll("th")
+                    l = [k.get_text() for k in header]
+                    values = table.find_next("tbody").findAll("tr")
+                    for u in values:
+                        cells=u.findAll("td")
+                        v=[s.strip() for s in [k.get_text() for k in cells]]
+                        if not v or v[2].strip("\n")=="SNP Mutations":
+                            break
+                        else:
+                            specimen_name = v[0]
+                            try:
+                                curr.execute('INSERT INTO "Specimen" ("Name", "SampledFrom") VALUES(%s, %s) RETURNING "Id";', ["NIAID_TBPortals_" + specimen_name, patient_id])
+                            except psycopg2.DatabaseError as error:
+                                if error.pgcode == "23505":
+                                    conn.rollback()
+                                    curr.execute('SELECT "Id" FROM "Specimen" WHERE "Name"=%s;', ["NIAID_TBPortals_" + specimen_name])
+                                else:
+                                    print(error)
+                            conn.commit()
+                            specimen_id = curr.fetchone()[0]
+                            if v[1] in ["Lowenstein-Jensen", "Bactec"]:
+                                tmp_dict = {}
+                                for i in range(2, len(v)):
+                                    if l[i]=="Date":
+                                        date = int(v[i].strip("Day "))
+                                    elif v[i]:
+                                        tmp_dict[l[i]]=v[i]
+                                for key, value in tmp_dict.items():
+                                    if key.split(" ")[0] in mapping_drugs.keys():
+                                        if key.startswith("Mfx"):
+                                            if len(key.split(" "))>1:
+                                                assay_id = assays[mapping_medium.get(v[1], "Lowenstein-Jensen")][mapping_drugs[key.split(" ")[0]]][float(key.split(" ")[1])]
+                                            else:
+                                                assay_id = assays[mapping_medium.get(v[1], "Lowenstein-Jensen")][mapping_drugs[key.split(" ")[0]]][None]
+                                        else:
+                                            assay_id = assays[mapping_medium.get(v[1], "Lowenstein-Jensen")][mapping_drugs[key.split(" ")[0]]]
+                                        try:
+                                            curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "AssayId",  "Result") VALUES(%s, %s, %s);', [specimen_id, assay_id, value])
+                                            conn.commit()
+                                        except psycopg2.DatabaseError as error:
+                                            if error.pgcode == "23505":
+                                                conn.rollback()
+                                            else:
+                                                raise(error)
+                        conn.commit()
+        http = urllib3.PoolManager()
+        all_data = http.request("GET", "https://data.tbportals.niaid.nih.gov/cases?dstProfile=sensitive%2CMDRnonXDR%2CpolyDR%2CmonoDR%2CXDR&sequenced=True&_take=100000")
+        match = re.compile("/patient/[a-z,0-9]{8}-[a-z,0-9]{4}-[a-z,0-9]{4}-[a-z,0-9]{4}-[a-z,0-9]{12}/case/details/[a-z,0-9]{8}-[a-z,0-9]{4}-[a-z,0-9]{4}-[a-z,0-9]{4}-[a-z,0-9]{12}")
+        print(len(re.findall(match, str(all_data.data))))
+        for url in re.findall(match, str(all_data.data)):
+            patient_data = http.request("GET", "https://data.tbportals.niaid.nih.gov/" + url)
+            extract_data(patient_data.data)
+        
+
+
+

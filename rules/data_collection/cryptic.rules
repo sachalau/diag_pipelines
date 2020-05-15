@@ -1,0 +1,137 @@
+rule fetch_all_non_SRR_ERR_from_cryptic:
+    input:
+        cryptic = "cryptic/raw_data.tsv",
+    output:
+        additional = "cryptic/additional_entries.tsv",
+    shell:
+        """
+        for query in $(tail -n +2 {input[cryptic]} | cut -f 5 | grep -v "^SRR" | grep -v "^ERR" | grep -v "PRJN" | sort | uniq)
+        do
+            SRA=$(esearch -db sra -query "$query" | efetch -format docsum | xtract -pattern DocumentSummary -element Run@acc)
+            echo $query $SRA >> {output[additional]}
+        done
+        """
+
+rule fetch_data_for_BCCDC:
+    output:
+        runinfo = "cryptic/BCCDC_runinfo.tsv",
+        phenotypic_data = "cryptic/BCCDC_phen.tsv",
+    shell:
+        """
+        
+        """
+
+
+rule load_cryptic_csv_into_db:
+    params:
+        host = config["db_host"],
+        user = config["db_user"],
+        db = config["db_name"],
+    input:
+        cryptic = "cryptic/raw_data.tsv",
+        addition = "cryptic/additional_entries.tsv",
+    output:
+        flag = "cryptic/loaded.txt",
+    run:
+        import pandas, re, psycopg2
+        from collections import defaultdict
+        conn = psycopg2.connect(host=params["host"],database=params["db"], user=params["user"])
+        curr = conn.cursor()
+        mapping_medium = {
+            "Casali et. al.": "Lowenstein-Jensen",
+            "London": "Lowenstein-Jensen",
+            "Oxford": "Lowenstein-Jensen",
+            "Pakistan": "Lowenstein-Jensen",
+            "Thailand via University of Singapore": "Middlebrook7H10",
+            "Peru via LSHTM": "Middlebrook7H9",
+            "Zhang et. al.": "Agar"
+        }
+        mapping_medium_type = {
+            "Lowenstein-Jensen": "Solid",
+            "Middlebrook7H10": "Solid",
+            "Agar": "Solid",
+            "MGIT": "Liquid",
+            "Middlebrook7H9": "Liquid"
+        }
+        drugs = {}
+        assays = defaultdict(dict)
+        mediums = {}
+        for medium in list(mapping_medium.values()) + ["MGIT"]:
+            curr.execute('SELECT "Id" FROM "Medium" WHERE "Name"=%s;', [medium])
+            try:
+                medium_id = curr.fetchone()[0]
+            except TypeError:
+                curr.execute('INSERT INTO "Medium" ("Name", "Type") VALUES (%s, %s) RETURNING "Id";', [medium, mapping_medium_type[medium]])
+                conn.commit()
+                medium_id = curr.fetchone()[0]
+            mediums[medium] = medium_id
+            for drug in ["Isoniazid", "Rifampicin", "Ethambutol", "Pyrazinamide"]:
+                curr.execute('SELECT "Id" FROM "Drug" WHERE "Name"=%s;', [drug])
+                try:
+                    drug_id = curr.fetchone()[0]
+                except TypeError:
+                    curr.execute('INSERT INTO "Drug" ("Name") VALUES (%s) RETURNING "Id";', [drugs])
+                    conn.commit()
+                    drug_id = curr.fetchone()[0]
+                drugs[drug] = drug_id
+                curr.execute('SELECT "Id" FROM "PhenotypicDrugSusceptibilityAssay" WHERE "DrugId"=%s AND "MediumId"=%s AND "Concentration" IS NULL;', [drug_id, medium_id])
+                try:
+                    assay_id = curr.fetchone()[0]
+                except TypeError:
+                    curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityAssay" ("DrugId", "MediumId") VALUES (%s, %s) RETURNING "Id";', [drug_id, medium_id])
+                    conn.commit()
+                    assay_id = curr.fetchone()[0]
+                assays[medium_id][drug_id] = assay_id
+        print(mediums, drugs, assays)
+        cryptic = pandas.read_csv(input["cryptic"], sep="\t", header=0)
+        cryptic = cryptic.loc[cryptic["SRA/ENA_accession"]!="PRJNA413593"]
+        print(cryptic)
+        additional = pandas.read_csv(input["addition"], sep=" ", index_col=0, names=["Id", "SRA"])
+        print(additional)
+        for index, row in cryptic.iterrows():
+            name = row["Sample_name"]
+            i = 1 
+            while name.startswith("SRR") or name.startswith("ERR"):
+                    name = cryptic.loc[index-i]["Sample_name"]
+                    i += 1
+            try:
+                curr.execute('INSERT INTO "Patient"("Name") VALUES (%s) RETURNING "Id";', ["CRyPTIC_" + name])
+                patient_id = curr.fetchone()[0]
+                curr.execute('INSERT INTO "Specimen" ("Name", "SampledFrom") VALUES(%s, %s) RETURNING "Id";', ["CRyPTIC_" + name, patient_id])
+                specimen_id = curr.fetchone()[0]
+                sra = row["SRA/ENA_accession"]
+                try:
+                    if sra.startswith("SRS") or sra.startswith("SAMN"):
+                        sra = additional.loc[sra]["SRA"]
+                except AttributeError:
+                    print(row)
+                curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', [specimen_id, sra])
+                conn.commit()
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+                    curr.execute('SELECT "Id" FROM "Specimen" WHERE "Name"=%s;', ["CRyPTIC_" + name])
+                    specimen_id = curr.fetchone()[0]
+                    try:
+                        sra = row["Sample_name"]
+                        if sra.startswith("SRS") or sra.startswith("SAMN"):
+                                sra = additional.loc[sra]["SRA"]
+                        curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', [specimen_id, sra])
+                        conn.commit()
+                    except psycopg2.DatabaseError as error:
+                        if error.pgcode == "23505":
+                            conn.rollback()
+                else:
+                    raise(error)
+            if name==row["Sample_name"]:
+                for drug, drug_id in drugs.items():
+                    if row[drug] in ["S", "R"]:
+                        assay_id = assays[mediums[mapping_medium.get(row["Source"], "MGIT")]][drug_id]
+                        curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "AssayId",  "Result") VALUES(%s, %s, %s);', [specimen_id, assay_id, row[drug]])
+                        conn.commit()
+            
+
+
+        
+        
+        
