@@ -53,9 +53,8 @@ rule load_cryptic_csv_into_db:
             "MGIT": "Liquid",
             "Middlebrook7H9": "Liquid"
         }
-        drugs = {}
+        drugs = ["Isoniazid", "Rifampicin", "Ethambutol", "Pyrazinamide"]
         assays = defaultdict(dict)
-        mediums = {}
         for medium in list(mapping_medium.values()) + ["MGIT"]:
             curr.execute('SELECT "Id" FROM "Medium" WHERE "Name"=%s;', [medium])
             try:
@@ -64,16 +63,14 @@ rule load_cryptic_csv_into_db:
                 curr.execute('INSERT INTO "Medium" ("Name", "Type") VALUES (%s, %s) RETURNING "Id";', [medium, mapping_medium_type[medium]])
                 conn.commit()
                 medium_id = curr.fetchone()[0]
-            mediums[medium] = medium_id
-            for drug in ["Isoniazid", "Rifampicin", "Ethambutol", "Pyrazinamide"]:
+            for drug in drugs:
                 curr.execute('SELECT "Id" FROM "Drug" WHERE "Name"=%s;', [drug])
                 try:
                     drug_id = curr.fetchone()[0]
                 except TypeError:
-                    curr.execute('INSERT INTO "Drug" ("Name") VALUES (%s) RETURNING "Id";', [drugs])
+                    curr.execute('INSERT INTO "Drug" ("Name") VALUES (%s) RETURNING "Id";', [drug])
                     conn.commit()
                     drug_id = curr.fetchone()[0]
-                drugs[drug] = drug_id
                 curr.execute('SELECT "Id" FROM "PhenotypicDrugSusceptibilityAssay" WHERE "DrugId"=%s AND "MediumId"=%s AND "Concentration" IS NULL;', [drug_id, medium_id])
                 try:
                     assay_id = curr.fetchone()[0]
@@ -81,8 +78,7 @@ rule load_cryptic_csv_into_db:
                     curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityAssay" ("DrugId", "MediumId") VALUES (%s, %s) RETURNING "Id";', [drug_id, medium_id])
                     conn.commit()
                     assay_id = curr.fetchone()[0]
-                assays[medium_id][drug_id] = assay_id
-        print(mediums, drugs, assays)
+                assays[medium][drug] = assay_id
         cryptic = pandas.read_csv(input["cryptic"], sep="\t", header=0)
         cryptic = cryptic.loc[cryptic["SRA/ENA_accession"]!="PRJNA413593"]
         print(cryptic)
@@ -124,9 +120,9 @@ rule load_cryptic_csv_into_db:
                 else:
                     raise(error)
             if name==row["Sample_name"]:
-                for drug, drug_id in drugs.items():
+                for drug in drugs.items():
                     if row[drug] in ["S", "R"]:
-                        assay_id = assays[mediums[mapping_medium.get(row["Source"], "MGIT")]][drug_id]
+                        assay_id = assays[mapping_medium.get(row["Source"], "MGIT")][drug]
                         curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "AssayId",  "Result") VALUES(%s, %s, %s);', [specimen_id, assay_id, row[drug]])
                         conn.commit()
             
