@@ -12,17 +12,94 @@ rule fetch_all_non_SRR_ERR_from_cryptic:
         done
         """
 
-rule fetch_data_for_BCCDC:
+rule fetch_data_runInfo_BCCDC:
     output:
         runinfo = "cryptic/BCCDC_runinfo.tsv",
+    shell:
+        """
+        esearch -db sra -query "PRJNA413593" | efetch -format runinfo | grep -v "BioSample" | cut -f1,26 -d',' > {output[runinfo]}
+        """
+
+rule fetch_drug_phenotypic_data_for_samples:
+    input:
+        runInfo = "cryptic/BCCDC_runinfo.tsv",
+    output:
         phenotypic_data = "cryptic/BCCDC_phen.tsv",
     shell:
         """
-        
+        for i in $(cut -f2 -d',' {input[runInfo]})
+        do
+           if [[ $i == SAMN* ]]
+           then
+               efetch -db biosample -id "$i" -format xml | xmllint --xpath "/BioSampleSet/BioSample/Description/Comment/Table/Body/Row/Cell/text()" - | tr -d " "  | grep -v "CLSI" | grep -v "liquid" | paste -sd" \n" | paste -sd" \n" | sed "s/^/$i /" >> {output[phenotypic_data]}
+           fi
+        done
         """
 
+rule load_bccdc:
+    params:
+        host = config["db_host"],
+        user = config["db_user"],
+        db = config["db_name"],
+    input:
+        runInfo = "cryptic/BCCDC_runinfo.tsv",
+        phenotypic_data = "cryptic/BCCDC_phen.tsv",
+    run:
+        import pandas, psycopg2
+        conn = psycopg2.connect(host=params["host"],database=params["db"], user=params["user"])
+        curr = conn.cursor()
+        libraries = pandas.read_csv(input["runInfo"], sep=",", header=None, names=["Run", "BioSample"])
+        statement = 'SELECT "Name", "Id" FROM "Specimen" WHERE "Name" LIKE ' + "'BCCDC_%';"
+        curr.execute(statement)
+        specimen = {x[0]:x[1] for x in curr.fetchall()}
+        for index, row in libraries.iterrows():
+            if "BCCDC_" + row["BioSample"] not in specimen.keys():
+                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) RETURNING "Id";', ["BCCDC_"+ row["BioSample"]])
+                specimen["BCCDC_" + row["BioSample"]] = curr.fetchone()[0]
+            specimen_id = specimen["BCCDC_"+row["BioSample"]]
+            try:
+                curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', [specimen_id, row["Run"]])
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    raise ValueError("Library Id " + row["Run"] + " previously inserted")
+        data = pandas.read_csv(input["phenotypic_data"], header=None, sep=" ", names=["Sample", "Drug", "Result", "Medium", "Concentration"])
+        mappings = {
+            "DrugFromDB": {'Rifampicin': 'Rifampin'},
+            "MediumFromDB":
+            {
+                "MGIT": "MGIT960",
+                "Lowenstein-Jensen": "Nitratereductaseassay"
+            },
+            "MethodFromDB":
+            {
+                "Direct": "MGIT960",
+                "Nitrate-reductase assay": "Nitratereductaseassay"
+            },
+            "Result":
+            {
+                "susceptible" : "S",
+                "resistant": "R"
+            }
+        }
+        ids = {}
+        #Get drugs, methods, mediums and assays
+        statement = 'SELECT "Name", "Id" FROM "Drug";'
+        curr.execute(statement)
+        drugs = {mappings["DrugFromDB"].get(x[0], x[0]).lower():x[1] for x in curr.fetchall()}
+        statement = 'SELECT "Name", "Id" FROM "PhenotypicDrugSusceptibilityAssessmentMethod";'
+        curr.execute(statement)
+        methods = {mappings["MethodFromDB"].get(x[0], x[0]):x[1] for x in curr.fetchall()}
+        statement = 'SELECT "Name", "Id" FROM "Medium";'
+        curr.execute(statement)
+        mediums = {mappings["MediumFromDB"].get(x[0], x[0]):x[1] for x in curr.fetchall()}
+        for index, row in data.iterrows():
+            curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "DrugId", "MediumId", "MethodId", "Concentration", "Result") VALUES (%s, %s, %s, %s, %s, %s);', (specimen["BCCDC_" + row["Sample"]], drugs[row["Drug"]], mediums[row["Medium"]], methods[row["Medium"]], row["Concentration"], mappings["Result"][row["Result"]]))
+        conn.commit()
 
-rule load_cryptic_csv_into_db:
+            
+                           
+    
+rule load_cryptic:
     params:
         host = config["db_host"],
         user = config["db_user"],
@@ -30,101 +107,107 @@ rule load_cryptic_csv_into_db:
     input:
         cryptic = "cryptic/raw_data.tsv",
         addition = "cryptic/additional_entries.tsv",
-    output:
-        flag = "cryptic/loaded.txt",
     run:
         import pandas, re, psycopg2
         from collections import defaultdict
         conn = psycopg2.connect(host=params["host"],database=params["db"], user=params["user"])
         curr = conn.cursor()
-        mapping_medium = {
-            "Casali et. al.": "Lowenstein-Jensen",
-            "London": "Lowenstein-Jensen",
-            "Oxford": "Lowenstein-Jensen",
-            "Pakistan": "Lowenstein-Jensen",
-            "Thailand via University of Singapore": "Middlebrook7H10",
-            "Peru via LSHTM": "Middlebrook7H9",
-            "Zhang et. al.": "Agar"
+        mappings= {
+            "Medium":
+            {
+                "Casali et. al.": "Lowenstein-Jensen",
+                "London": "Lowenstein-Jensen",
+                "Oxford": "Lowenstein-Jensen",
+                "Pakistan": "Lowenstein-Jensen",
+                "Thailand via University of Singapore": "Middlebrook7H10",
+                "Peru via LHSTM": "Middlebrook7H9",
+                "Zhang et. al": "Agar"
+            },
+            "Method":
+            {
+                "Casali et. al.": "Resistance Ratio",
+                "London": "Resistance Ratio",
+                "Oxford": "Resistance Ratio",
+                "Pakistan": "Proportions",
+                "Thailand via University of Singapore": "Proportions",
+                "Zhang et. al": "Proportions"
+            },
+            "Concentration": 
+            {
+                "Pakistan": {
+                    "Isoniazid": 0.2,
+                    "Rifampicin": 40,
+                    "Ethambutol": 2,
+                    "Pyrazinamide": 100
+                },
+                "Thailand via University of Singapore": {
+                    "Isoniazid": 0.1,
+                    "Rifampicin": 1,
+                    "Ethambutol": 5
+                },
+                "Peru via LSHTM": {
+                    "Isoniazid": 0.4,
+                    "Rifampicin": 1
+                },
+                "Zhang et. al.": {
+                    "Isoniazid": 0.2,
+                    "Rifampicin": 40,
+                    "Ethambutol": 2,
+                },
+                "London": defaultdict(dict),
+                "Casali et. al.": defaultdict(dict),
+                "Oxford": defaultdict(dict)
+            },
         }
-        mapping_medium_type = {
-            "Lowenstein-Jensen": "Solid",
-            "Middlebrook7H10": "Solid",
-            "Agar": "Solid",
-            "MGIT": "Liquid",
-            "Middlebrook7H9": "Liquid"
-        }
-        drugs = ["Isoniazid", "Rifampicin", "Ethambutol", "Pyrazinamide"]
-        assays = defaultdict(dict)
-        for medium in list(mapping_medium.values()) + ["MGIT"]:
-            curr.execute('SELECT "Id" FROM "Medium" WHERE "Name"=%s;', [medium])
-            try:
-                medium_id = curr.fetchone()[0]
-            except TypeError:
-                curr.execute('INSERT INTO "Medium" ("Name", "Type") VALUES (%s, %s) RETURNING "Id";', [medium, mapping_medium_type[medium]])
-                conn.commit()
-                medium_id = curr.fetchone()[0]
-            for drug in drugs:
-                curr.execute('SELECT "Id" FROM "Drug" WHERE "Name"=%s;', [drug])
-                try:
-                    drug_id = curr.fetchone()[0]
-                except TypeError:
-                    curr.execute('INSERT INTO "Drug" ("Name") VALUES (%s) RETURNING "Id";', [drug])
-                    conn.commit()
-                    drug_id = curr.fetchone()[0]
-                curr.execute('SELECT "Id" FROM "PhenotypicDrugSusceptibilityAssay" WHERE "DrugId"=%s AND "MediumId"=%s AND "Concentration" IS NULL;', [drug_id, medium_id])
-                try:
-                    assay_id = curr.fetchone()[0]
-                except TypeError:
-                    curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityAssay" ("DrugId", "MediumId") VALUES (%s, %s) RETURNING "Id";', [drug_id, medium_id])
-                    conn.commit()
-                    assay_id = curr.fetchone()[0]
-                assays[medium][drug] = assay_id
+        #Get drugs, medium, methods, assays
+        statement = 'SELECT "Name", "Id" FROM "Drug";'
+        curr.execute(statement)
+        drugs = {x[0]:x[1] for x in curr.fetchall()}
+        statement = 'SELECT "Name", "Id" FROM "PhenotypicDrugSusceptibilityAssessmentMethod";'
+        curr.execute(statement)
+        methods = {x[0]:x[1] for x in curr.fetchall()}
+        for x in mappings["Method"].keys():
+            methods[x] = methods[mappings["Method"][x]]
+        statement = 'SELECT "Name", "Id" FROM "Medium";'
+        curr.execute(statement)
+        mediums = {x[0]:x[1] for x in curr.fetchall()}
+        for x in mappings["Medium"].keys():
+            mediums[x] = mediums[mappings["Medium"][x]]
+        statement = 'SELECT "Name", "Id" FROM "Specimen" WHERE "Name" LIKE ' + "'CRyPTIC_%';"
+        curr.execute(statement)
+        specimen = {x[0]:x[1] for x in curr.fetchall()}
         cryptic = pandas.read_csv(input["cryptic"], sep="\t", header=0)
         cryptic = cryptic.loc[cryptic["SRA/ENA_accession"]!="PRJNA413593"]
-        print(cryptic)
         additional = pandas.read_csv(input["addition"], sep=" ", index_col=0, names=["Id", "SRA"])
-        print(additional)
         for index, row in cryptic.iterrows():
             name = row["Sample_name"]
+            sra = row["SRA/ENA_accession"]
             i = 1 
             while name.startswith("SRR") or name.startswith("ERR"):
-                    name = cryptic.loc[index-i]["Sample_name"]
-                    i += 1
+                sra = row["Sample_name"]
+                name = cryptic.loc[index-i]["Sample_name"]
+                i += 1
+            if "CRyPTIC_" + name not in specimen.keys():
+                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) RETURNING "Id";', ["CRyPTIC_"+name])
+                specimen["CRyPTIC_"+name] = curr.fetchone()[0]
+            specimen_id = specimen["CRyPTIC_"+name]
+            if sra.startswith("SRS") or sra.startswith("SAMN"):
+                sra = additional.loc[sra]["SRA"]
             try:
-                curr.execute('INSERT INTO "Patient"("Name") VALUES (%s) RETURNING "Id";', ["CRyPTIC_" + name])
-                patient_id = curr.fetchone()[0]
-                curr.execute('INSERT INTO "Specimen" ("Name", "SampledFrom") VALUES(%s, %s) RETURNING "Id";', ["CRyPTIC_" + name, patient_id])
-                specimen_id = curr.fetchone()[0]
-                sra = row["SRA/ENA_accession"]
-                try:
-                    if sra.startswith("SRS") or sra.startswith("SAMN"):
-                        sra = additional.loc[sra]["SRA"]
-                except AttributeError:
-                    print(row)
                 curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', [specimen_id, sra])
-                conn.commit()
             except psycopg2.DatabaseError as error:
                 if error.pgcode == "23505":
-                    conn.rollback()
-                    curr.execute('SELECT "Id" FROM "Specimen" WHERE "Name"=%s;', ["CRyPTIC_" + name])
-                    specimen_id = curr.fetchone()[0]
-                    try:
-                        sra = row["Sample_name"]
-                        if sra.startswith("SRS") or sra.startswith("SAMN"):
-                                sra = additional.loc[sra]["SRA"]
-                        curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', [specimen_id, sra])
-                        conn.commit()
-                    except psycopg2.DatabaseError as error:
-                        if error.pgcode == "23505":
-                            conn.rollback()
-                else:
-                    raise(error)
+                    print("Library Id " + sra + " previously inserted")
+                    raise
             if name==row["Sample_name"]:
-                for drug in drugs.items():
+                for drug in ["Isoniazid", "Rifampicin", "Pyrazinamide", "Ethambutol"]:
                     if row[drug] in ["S", "R"]:
-                        assay_id = assays[mapping_medium.get(row["Source"], "MGIT")][drug]
-                        curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "AssayId",  "Result") VALUES(%s, %s, %s);', [specimen_id, assay_id, row[drug]])
-                        conn.commit()
+                        curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "DrugId", "MediumId", "MethodId", "Result", "Concentration") VALUES(%s, %s, %s, %s, %s, %s);', (specimen_id, drugs[drug], mediums.get(row["Source"], mediums["MGIT"]), methods.get(row["Source"], methods["Direct"]), row[drug], mappings["Concentration"].get(row["Source"], {"Isoniazid": 0.1, "Rifampicin": 1, "Ethambutol":5, "Pyrazinamide":100}).get(drug, None)))
+        conn.commit()
+
+                
+
+
             
 
 
