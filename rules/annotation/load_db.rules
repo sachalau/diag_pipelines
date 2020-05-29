@@ -4,32 +4,29 @@ rule prepare_gff_for_db:
     output:
         genes = "{any_gff}_genes.tsv",
         proteins = "{any_gff}_proteins.tsv",
+        non_coding_transcripts = "{any_gff}_nc_transcripts.tsv",
     run:
         from BCBio import GFF
         import psycopg2, pandas
         gene_data = []
         protein_data = []
+        nc_transcripts_data = []
         gff = GFF.parse(open(input["gff"]))
         for seq_record in gff:
             for features in seq_record.features:
                 if features.type=="gene":
-                    if "gene_synonym" in features.qualifiers.keys():
-                        gene_data.append([features.location.start, features.location.end, features.location.strand, features.qualifiers["locus_tag"][0], features.qualifiers["Name"][0], features.qualifiers["gene_synonym"][0]])
-                    else:
-                        gene_data.append([features.location.start, features.location.end, features.location.strand, features.qualifiers["locus_tag"][0], features.qualifiers["Name"][0], ""])
-        limit_info=dict(
-            gff_source_type=[
-                ('RefSeq', 'CDS'), 
-            ],
-            gff_source=['RefSeq']
-        )
+                    gene_data.append([features.qualifiers["Dbxref"][0].replace("GeneID:", ""), features.location.start, features.location.end, features.location.strand, features.qualifiers["locus_tag"][0], features.qualifiers["Name"][0], features.qualifiers.get("gene_synonym", [""])[0]])
         gff_protein = GFF.parse(open(input["gff"]), limit_info={'gff_source_type':[('RefSeq', 'CDS')], 'gff_source':['RefSeq']})
         for seq_record in gff_protein:
             for features in seq_record.features:
-                protein_data.append([features.qualifiers["Name"][0], features.qualifiers["locus_tag"][0], (features.location.end-features.location.start)/3-1])
-                    
+                protein_data.append([features.qualifiers["Name"][0], features.qualifiers["locus_tag"][0], (features.location.end-features.location.start)/3-1, features.qualifiers.get("product", [""])[0]])
+        gff_ncoding = GFF.parse(open(input["gff"]), limit_info={'gff_source_type':[('RefSeq', 'exon')], 'gff_source':['RefSeq']})
+        for seq_record in gff_ncoding:
+            for features in seq_record.features:
+                nc_transcripts_data.append([features.qualifiers["locus_tag"][0], features.qualifiers.get("product", [""])[0]])
         pandas.DataFrame(gene_data).to_csv(output["genes"], sep="\t", header=False, index=False)
         pandas.DataFrame(protein_data).to_csv(output["proteins"], sep="\t", header=False, index=False)
+        pandas.DataFrame(nc_transcripts_data).to_csv(output["non_coding_transcripts"], sep="\t", header=False, index=False)
 
 
 rule load_annotation_into_db:
@@ -40,23 +37,30 @@ rule load_annotation_into_db:
     input:
         genes = "references/{reference}/genome_genes.tsv",
         proteins = "references/{reference}/genome_proteins.tsv",
+        nc_transcripts = "references/{reference}/genome_nc_transcripts.tsv",
+        flag = "db_created.txt",
     output:
         loaded = "references/{reference}/genome_loaded.txt",
     run:
         import psycopg2, pandas
-        proteins = pandas.read_csv(input["proteins"], sep="\t", header=None, names=["NP", "LocusTag", "Length"])
+        proteins = pandas.read_csv(input["proteins"], sep="\t", header=None, names=["NP", "LocusTag", "Length", "Description"])
+        nc_transcripts = pandas.read_csv(input["nc_transcripts"], sep="\t", header=None, names=["LocusTag", "Description"])
         conn = psycopg2.connect(host=params["host"], database=params["db"], user=params["user"])
         curr = conn.cursor()
         try:
             curr.execute('INSERT INTO "Annotation"("Name") VALUES (%s) RETURNING "Id";', [wildcards["reference"]])
             annotation_id = curr.fetchone()[0]
             conn.commit()
-            for index, row in pandas.read_csv(input["genes"], sep="\t", header=None).fillna("").iterrows():
-                curr.execute('INSERT INTO "Gene"("Annotation", "Start", "End", "Direction", "LocusTag", "Name", "AlternativeName") VALUES(%s, %s, %s, %s, %s, %s, %s) RETURNING "Id";', [annotation_id] + list(row))
+            for index, row in pandas.read_csv(input["genes"], sep="\t", header=None, names=["Accession", "Start", "End", "Direction", "LocusTag", "Name", "Synonym"]).fillna("").iterrows():
+                curr.execute('INSERT INTO "Gene"("Annotation", "Accession", "Start", "End", "Direction", "LocusTag", "Name", "AlternativeName") VALUES(%s, %s, %s, %s, %s, %s, %s, %s) RETURNING "Id";', [annotation_id] + list(row))
                 gene_id=curr.fetchone()[0]
-                prot=proteins.loc[proteins['LocusTag'] == row[3]]
+                prot=proteins.loc[proteins['LocusTag'] == row["LocusTag"]]
                 if not prot.empty:
-                    curr.execute('INSERT INTO "Protein"("Name", "GeneId", "Length") VALUES(%s, %s, %s);', [prot["NP"].iloc[0]] + [gene_id] + [prot["Length"].iloc[0]])
+                    curr.execute('INSERT INTO "Protein"("Accession", "GeneId", "Length", "Description") VALUES(%s, %s, %s, %s);', [prot["NP"].iloc[0]] + [gene_id] + [prot["Length"].iloc[0]] + [prot["Description"].iloc[0]])
+                else:
+                    nc = nc_transcripts.loc[nc_transcripts["LocusTag"]==row["LocusTag"]]
+                    if not nc.empty:
+                        curr.execute('INSERT INTO "NonCodingTranscript"("GeneId", "Description") VALUES(%s, %s);', [gene_id] + [nc["Description"].iloc[0]])
                 conn.commit()
             open(output["loaded"], "w").close()
         except psycopg2.DatabaseError as error:
@@ -77,30 +81,98 @@ rule load_all_data_for_library:
         user = config["db_user"],
         db = config["db_name"],
     input:
-        genotype_formated = "{any_vcf}_formated_genotype.tsv",
+        genotype_formated = "samples/{sample}/genotyping/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}/snps_split_snpEff_formated_genotype.tsv",
+        substitutions = "samples/{sample}/genotyping/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}/snps_split_snpEff_formated_prot_substitution.tsv",
+        synonymous = "samples/{sample}/genotyping/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}/snps_split_snpEff_formated_prot_synonymous.tsv",
+        formated = "samples/{sample}/genotyping/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}/snps_split_snpEff_db.tsv",
+        genome_loaded = "references/{reference}/genome_loaded.txt",
     output:
-        loaded = "{any_vcf}_genotype_loaded.txt",
+        loaded = "samples/{sample}/genotyping/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}/snps_genotype_loaded.txt",
     run:
         import psycopg2, pandas
         conn = psycopg2.connect(host=params["host"], database=params["db"], user=params["user"])
         curr = conn.cursor()
         variants = pandas.read_csv(input["genotype_formated"], sep="\t", header=None, names=["Sample", "Chrom", "Pos", "Ref", "Alt", "QUAL", "AD", "DP", "Filter"])
-        print(variants)
         variants[["ref_AD", "alt_AD"]] = variants["AD"].str.split(",", expand=True).astype(int)
-        curr.execute('SELECT "Id" FROM "Annotation" WHERE "Name"=%s;', [variants[["Chrom"]].iloc[0]])
+        curr.execute('SELECT "Id" FROM "Annotation" WHERE "Name"=%s;', [variants[["Chrom"]].iloc[0,0]])
         annotation_id = curr.fetchone()[0]
-        print(annotation_id)
+        statement = 'Select "Name", "Id" FROM "Library";'
+        curr.execute(statement)
+        libraries = {x[0]:x[1] for x in curr.fetchall()}
+        library_name = variants[["Sample"]].iloc[0,0]
+        if library_name not in libraries.keys():
+            curr.execute('INSERT INTO "Library"("Name") VALUES (%s) RETURNING "Id";', [library_name])
+            library_id = curr.fetchone()[0]
+        else:
+            library_id = libraries[library_name]
+        statement = 'SELECT "Chrom", "Pos", "RefNucl", "AltNucl", "Id" FROM "Variant";'
+        variants = {(x[0], x[1], x[2], x[3]):x[4] for x in curr.fetchall()}        
         for index, row in variants.iterrows():
-            curr.execute('SELECT "VariantId" FROM "Variant" WHERE "Chrom" = %s AND "Pos" = %s AND "RefNucl" = %s AND "AltNucl" = %s;', row[["Chrom", "Pos", "Ref", "Alt"]])
-            variant_id = curr.fetchone()[0]
+            if (annotation_id, row["Pos"], row["RefNucl"], row["AltNucl"]) not in variants.keys():
+                curr.execute('INSERT INTO "Variant"("Chrom", "Pos", "RefNucl", "AltNucl") VALUES(%s, %s, %s, %s) RETURNING "Id";', [annotation_id] + list(row[["Pos", "Ref", "Alt"]]))
+                variants[(annotation_id, row["Pos"], row["RefNucl"], row["AltNucl"])]= curr.fetchone()[0]
+            variant_id = variants[(annotation_id, row["Pos"], row["RefNucl"], row["AltNucl"])]
             try:
-                curr.execute('INSERT INTO "Genotype"("VariantId", "SequencedLibraryId", "QualValue", "RefAD", "AltAD", "TotalDP", "Filter") VALUES(%s, %s, %s, %s, %s, %s, %s);', [variant_id] + list(row[["Sample", "QUAL", "ref_AD", "alt_AD", "DP", "Filter"]]))
+                curr.execute('INSERT INTO "Genotype"("VariantId", "LibraryId", "QualValue", "RefAD", "AltAD", "TotalDP") VALUES(%s, %s, %s, %s, %s, %s);', [variant_id] + [sample_id] + list(row[["QUAL", "ref_AD", "alt_AD", "DP"]]))
                 conn.commit()
             except psycopg2.DatabaseError as error:
                 if error.pgcode == "23505":
                     conn.rollback()
-                else:
-                    print(error)
+        protein_variants=pandas.read_csv(input["substitutions"], sep="\t", header=0)
+        #Statement to fetch all proteins ids
+        statement = ""
+        curr.execute(statement)
+        protein_ids = {x[0]:x[1] for x in curr.fetchall()}
+        for index, row in protein_variants.iterrows():
+            curr.execute('SELECT "Protein"."Id" FROM "Protein" INNER JOIN "Gene" ON "Protein"."GeneId"="Gene"."Id" WHERE "Gene"."LocusTag"=%s;', list(row[["Gene_ID"]].str.replace("gene-", "")))
+            try:
+                protein_id = curr.fetchone()[0]
+            except TypeError as e:
+                print(row)
+                raise(e)
+            curr.execute('Select "Id" FROM "AminoAcid" WHERE "OneLetterCode"=%s;', list(row[["RefAA"]]))
+            ref_aa = curr.fetchone()[0]
+            curr.execute('Select "Id" FROM "AminoAcid" WHERE "OneLetterCode"=%s;', list(row[["AltAA"]]))
+            alt_aa = curr.fetchone()[0]
+            try:
+                curr.execute('INSERT INTO "MissenseAminoAcidChange"("ProteinId", "RefAA", "AltAA", "Pos") VALUES (%s, %s, %s, %s) RETURNING "Id";', [protein_id, ref_aa, alt_aa] + list(row[["StartPos"]]))
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+                    curr.execute('SELECT "Id" FROM "MissenseAminoAcidChange" WHERE "ProteinId"=%s AND "RefAA"=%s AND "AltAA"=%s AND "Pos"=%s;', [protein_id, ref_aa, alt_aa] + list(row[["StartPos"]]))
+            protein_annot_id = curr.fetchone()[0]
+            curr.execute('SELECT "Id" FROM "Variant" WHERE "Chrom"=%s AND "Pos"=%s AND "RefNucl"=%s AND "AltNucl"=%s;', [annotation_id] + list(row[["Pos", "Ref", "Alt"]]))
+            variant_id=curr.fetchone()[0]
+            try:
+                curr.execute('INSERT INTO "VariantToMissenseAminoAcidChange"("VariantId", "AminoAcidChangeId") VALUES (%s, %s);', [variant_id, protein_annot_id])
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+            conn.commit()
+        synonymous_variants = pandas.read_csv(input["synonymous"], sep="\t", header=0)
+        for index, row in synonymous_variants.iterrows():
+            curr.execute('SELECT "Protein"."Id" FROM "Protein" INNER JOIN "Gene" ON "Protein"."GeneId"="Gene"."Id" WHERE "Gene"."LocusTag"=%s;', list(row[["Gene_ID"]].str.replace("gene-", "")))
+            try:
+                protein_id = curr.fetchone()[0]
+            except TypeError as e:
+                raise(e)
+            curr.execute('Select "Id" FROM "AminoAcid" WHERE "OneLetterCode"=%s;', list(row[["RefAA"]]))
+            ref_aa = curr.fetchone()[0]
+            try:
+                curr.execute('INSERT INTO "SilentAminoAcidChange"("ProteinId", "RefAA", "Pos") VALUES (%s, %s, %s) RETURNING "Id";', [protein_id, ref_aa] + list(row[["StartPos"]]))
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+                    curr.execute('SELECT "Id" FROM "SilentAminoAcidChange" WHERE "ProteinId"=%s AND "RefAA"=%s AND "Pos"=%s;', [protein_id, ref_aa] + list(row[["StartPos"]]))
+            protein_annot_id = curr.fetchone()[0]
+            curr.execute('SELECT "Id" FROM "Variant" WHERE "Chrom"=%s AND "Pos"=%s AND "RefNucl"=%s AND "AltNucl"=%s;', [annotation_id] + list(row[["Pos", "Ref", "Alt"]]))
+            variant_id=curr.fetchone()[0]
+            try:
+                curr.execute('INSERT INTO "VariantToSilentAminoAcidChange"("VariantId", "AminoAcidChangeId") VALUES (%s, %s);', [variant_id, protein_annot_id])
+            except psycopg2.DatabaseError as error:
+                if error.pgcode == "23505":
+                    conn.rollback()
+            conn.commit()
         curr.close()
         open(output["loaded"], "w").close()
 
