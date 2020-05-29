@@ -269,4 +269,5 @@ rule extract_annotation_for_protein_change:
         pandas.DataFrame(final_annotation).to_csv(output["substitution"], index=False, sep="\t")
 
 
+        
                                   
