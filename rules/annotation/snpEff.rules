@@ -1,76 +1,119 @@
 rule create_snpEff_config_file:
     output:
-        config_file = "references/{reference}/snpEff/snpEff.config",
+        config_file = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/snpEff.config",
     shell:
         """
         echo "codon.Bacterial_and_Plant_Plastid : TTT/F, TTC/F, TTA/L, TTG/L+, TCT/S, TCC/S, TCA/S, TCG/S, TAT/Y, TAC/Y, TAA/*, TAG/*, TGT/C, TGC/C, TGA/*, TGG/W, CTT/L, CTC/L, CTA/L, CTG/L+, CCT/P, CCC/P, CCA/P, CCG/P, CAT/H, CAC/H, CAA/Q, CAG/Q, CGT/R, CGC/R, CGA/R, CGG/R, ATT/I+, ATC/I+, ATA/I+, ATG/M+, ACT/T, ACC/T, ACA/T, ACG/T, AAT/N, AAC/N, AAA/K, AAG/K, AGT/S, AGC/S, AGA/R, AGG/R, GTT/V, GTC/V, GTA/V, GTG/V+, GCT/A, GCC/A, GCA/A, GCG/A, GAT/D, GAC/D, GAA/E, GAG/E, GGT/G, GGC/G, GGA/G, GGG/G" > {output[config_file]}
-        echo "{wildcards.reference}.genome: H37Rv" >> {output[config_file]}
-        echo "{wildcards.reference}.chromosomes: {wildcards.reference}" >> {output[config_file]}
-        echo "{wildcards.reference}.{wildcards.reference}.codonTable: Bacterial_and_Plant_Plastid" >> {output[config_file]}
+        echo "{wildcards.nucleotide_ncbidb_accession}.genome: H37Rv" >> {output[config_file]}
+        echo "{wildcards.nucleotide_ncbidb_accession}.chromosomes: {wildcards.nucleotide_ncbidb_accession}" >> {output[config_file]}
+        echo "{wildcards.nucleotide_ncbidb_accession}.{wildcards.nucleotide_ncbidb_accession}.codonTable: Bacterial_and_Plant_Plastid" >> {output[config_file]}
         """
 
 
-rule link_files_for_snpEff_config:
+rule link_gff_files_for_snpEff_config:
     input:
-        annotation = "references/{reference}/genome_fixed.gff",
-        genome = "references/{reference}/genome_fasta.fasta",
+        annotation = "references/{taxId}/{nucleotide_ncbidb_accession}/genome_fixed.{annotation_extension}",
+        genome = "references/{taxId}/{nucleotide_ncbidb_accession}/genome.fasta",
     output:
-        refseq = "references/{reference}/snpEff/data/{reference}/genes.gff",
-        sequences = "references/{reference}/snpEff/data/{reference}/sequences.fa",
+        refseq = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/data/{nucleotide_ncbidb_accession}/genes.{annotation_extension}",
+        sequences = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/data/{nucleotide_ncbidb_accession}/sequences.fa",
     shell:
         """
-        cp {input[annotation]} {output[refseq]}
+        sed "s/\\ttRNA\\t/\\trRNA\\t/" {input[annotation]} > {output[refseq]}
         cp {input[genome]} {output[sequences]}
         """
 
 
+
+
 rule fix_gff_for_snpEff:
     input:
-        gff = "{any_gff}.gff",
+        annotation = "{any_gff}.{annotation_extension}",
     output:
-        gff_fixed = "{any_gff}_fixed.gff",
+        annotation_fixed = "{any_gff}_fixed.{annotation_extension}",
     run:
         from BCBio import GFF
         import Bio
         from Bio import SeqIO
-        gff = GFF.parse(open(input["gff"]))
-        for record in gff:
-            for features in record.features:
-                if features.type=="pseudogene":
-                    if "gene" not in features.qualifiers:
-                        features.qualifiers["gene"]=features.qualifiers["locus_tag"]
-        GFF.write([record], open(output["gff_fixed"], "w"))
-    
+        if wildcards["annotation_extension"]=="gff":
+            gff = GFF.parse(open(input["annotation"]), limit_info={'gff_source_type':[('RefSeq', 'tRNA'), ("RefSeq", "gene"), ("RefSeq", "CDS"), ("RefSeq", "ncRNA"), ("RefSeq", "exon"), ("RefSeq", "rRNA"), ("RefSeq", "pseudogene"), ("RefSeq", "repeat_region"), ("RefSeq", "mobile_genetic_element"), ("RefSeq", "sequence_feature"), ("RefSeq", "transcript"), ("RefSeq", "region")], 'gff_source':['RefSeq']})
+            for record in gff:
+                for features in record.features:
+                    if features.type=="pseudogene":
+                        if "gene" not in features.qualifiers:
+                            features.qualifiers["gene"]=features.qualifiers["locus_tag"]
+            GFF.write([record], open(output["annotation_fixed"], "w"))
+        elif wildcards["annotation_extension"]=="gbk":
+            gbk = SeqIO.parse(open(input["annotation"]), "genbank")
+            for record in gbk:
+                record.name = record.annotations["accessions"][0] + "." + str(record.annotations["sequence_version"])
+#                for features in record.features:
+#                    if features.type=="rRNA":
+#                        features.qualifiers["gene_biotype"]="rRNA"
+#                        features.qualifiers["gene_type"]="rRNA"
+#                        features.qualifiers["biotype"]="rRNA"
+#                    if features.type=="gene" and features.qualifiers["locus_tag"]==["Rvnr02"]:
+#                        features.qualifiers["gene_biotype"]="rRNA"
+#                        features.qualifiers["gene_type"]="rRNA"
+#                        features.qualifiers["biotype"]="rRNA"
+            SeqIO.write(record, open(output["annotation_fixed"], "w"), "genbank")
+        
 
+rule load_annotation_into_BioSQL:
+    input:
+        gff = "{any_gff}.{annotation_extension}",
+    output:
+        loaded = "{any_gff}.{annotation_extension}.txt"
+    run:
+        from Bio import SeqIO
+        from BCBio import GFF
+        from BioSQL import BioSeqDatabase
+        server = BioSeqDatabase.open_database(driver="psycopg2", user="sacha", host = "localhost", db="biosqldb")
+        db = server["orchids"]
+        if wildcards["annotation_extension"]=="gff":
+            count = db.load(GFF.parse(open(input["gff"])))
+        elif wildcards["annotation_extension"]=="gbff":
+            count = db.load(SeqIO.parse(open(input["gbff"]), "genbank"))
+        print("Loaded %i records" % count)
+        server.commit() 
+
+        
         
 rule create_snpEff_database:
     conda:
         pipeline_path + "envs/snpEff.yml"
     input:
-        gff = "references/{reference}/snpEff/data/{reference}/genes.gff",
-        sequences = "references/{reference}/snpEff/data/{reference}/sequences.fa",
-        config_file = "references/{reference}/snpEff/snpEff.config",
+        annotation = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/data/{nucleotide_ncbidb_accession}/genes.{annotation_extension}",
+        sequences = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/data/{nucleotide_ncbidb_accession}/sequences.fa",
+        config_file = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/snpEff.config",
     output:
-        predictor_bin = "references/{reference}/snpEff/data/{reference}/snpEffectPredictor.bin",
+        predictor_bin = "references/{taxId}/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/data/{nucleotide_ncbidb_accession}/snpEffectPredictor.bin",
     shell:
         """
-        snpEff build -gff3 -config {input[config_file]} {wildcards.reference}
+        if [[ "{wildcards.annotation_extension}" = "gff" ]]
+        then
+            build="gff3"
+        else
+            build="genbank"
+        fi
+        snpEff build -${{build}} -nodownload -v -config {input[config_file]} {wildcards.nucleotide_ncbidb_accession}
         """
-        
+
+
         
 
 rule annotate_vcf_with_snpEff:
     conda:
         pipeline_path + "envs/snpEff.yml"
     input:
-        vcf = "samples/{sample}/genotyping/{any_genotyper}/{reference}/{any_mapper}/{any_vcf}.vcf",
-        predictor_bin = "references/{reference}/snpEff/data/{reference}/snpEffectPredictor.bin",
-        config_file = "references/{reference}/snpEff/snpEff.config",
+        vcf = "samples/{sample}/genotyping/{any_genotyper}/{nucleotide_ncbidb_accession}/{any_mapper}/{any_vcf}.vcf",
+        predictor_bin = lambda wildcards: "references/" + accession_to_taxId[wildcards["nucleotide_ncbidb_accession"]] + "/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/data/{nucleotide_ncbidb_accession}/snpEffectPredictor.bin",
+        config_file = lambda wildcards: "references/" + accession_to_taxId[wildcards["nucleotide_ncbidb_accession"]] + "/{nucleotide_ncbidb_accession}/{annotation_extension}/snpEff/snpEff.config",
     output:
-        annotated_vcf = temp("samples/{sample,[^/]+}/genotyping/{any_genotyper,[^/]+}/{reference,[^/]+}/{any_mapper,[^/]+}/{any_vcf}_snpEff.vcf")
+        annotated_vcf = temp("samples/{sample,[^/]+}/genotyping/{any_genotyper,[^/]+}/{nucleotide_ncbidb_accession}/{any_mapper,[^/]+}/{any_vcf}_snpEff_{annotation_extension}.vcf")
     shell:
         """
-        snpEff ann -upDownStreamLen 2000 -noStats -config {input[config_file]} -nodownload -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {wildcards.reference} {input[vcf]} > {output[annotated_vcf]}
+        snpEff ann -upDownStreamLen 2000 -noStats -config {input[config_file]} -nodownload -ss 0 -spliceRegionExonSize 0 -spliceRegionIntronMax 0 -spliceRegionIntronMin 0 {wildcards.nucleotide_ncbidb_accession} {input[vcf]} > {output[annotated_vcf]}
         """
 
         
@@ -90,7 +133,7 @@ rule split_vcf:
         
 rule format_vcf_before_loading_into_variant_table:
     conda:
-        pipeline_path + "envs/snpEff.yml",
+        pipeline_path + "envs/bcftools.yml",
     input:
         vcf = "{any_vcf}.vcf.gz",
     output:
@@ -103,14 +146,14 @@ rule format_vcf_before_loading_into_variant_table:
         
 rule format_vcf_before_loading_into_genotype_table:
     conda:
-        pipeline_path + "envs/snpEff.yml",
+        pipeline_path + "envs/bcftools.yml",
     input:
         vcf = "{any_vcf}.vcf.gz",
     output:
         vcf_formated = temp("{any_vcf}_formated_genotype.tsv"),
     shell:
         """
-        bcftools query -f "[%SAMPLE]\\t%CHROM\\t%POS\\t%REF\\t%ALT\\t%QUAL\\t[%AD]\\t[%DP]\\t%FILTER\\n" {input[vcf]} | awk '$5!="<NON_REF>"' > {output[vcf_formated]}
+        bcftools query -f "[%SAMPLE]\\t%CHROM\\t%POS\\t%REF\\t%ALT\\t%QUAL\\t[%AD]\\t[%DP]\\t%FILTER\\n" {input[vcf]} > {output[vcf_formated]}
         """
 
         
@@ -131,7 +174,7 @@ rule format_snpEff_annotation_for_db:
     input:
         vcf = "{any_vcf}_snpEff_ANN.tsv",
     output:
-        formated = temp("{any_vcf}_snpEff_db.tsv"),
+        formated = "{any_vcf}_snpEff_db.tsv",
     run:
         import pandas
         snpEff = pandas.read_csv(input["vcf"], sep=" ", names=["Chrom", "Pos", "Ref", "Alt","Annotation"], index_col=[0,1,2,3])["Annotation"].str.split(",", expand=True).stack().reset_index()[["Chrom", "Pos", "Ref", "Alt", 0]].set_index(["Chrom", "Pos", "Ref", "Alt"])[0].str.split("|", expand=True)
@@ -144,213 +187,86 @@ rule extract_annotation_for_protein_change:
     input:
         formated = "{any_vcf}_snpEff_db.tsv",
     output:
-        substitution = temp("{any_vcf}_snpEff_formated_protein_change.tsv"),
+        substitution = temp("{any_vcf}_snpEff_formated.tsv"),        
     run:
-        import pandas, re
+        import pandas, re, hgvs.parser, hgvs.validator
+        def n_parse_error(x):
+            try:
+                return parser.parse_c_posedit(x)
+            except TypeError:
+                return ""
+            except hgvs.exceptions.HGVSParseError as e:
+                reg = r'n\.'
+                if re.match(reg, x):
+                    try:
+                        return(parser.parse_n_posedit(x.replace("n.", "")))
+                    except hgvs.exceptions.HGVSParseError as e:
+                        print(x)
+                        print(e)
+                else:
+                    print(e)
+        def cn_parse_errors(x):
+            try:
+                return parser.parse_c_posedit(x.replace("c.",""))
+            except hgvs.exceptions.HGVSParseError as e:
+                try:
+                    return parser.parse_c_posedit(x.replace("n.",""))
+                except hgvs.exceptions.HGVSParseError as e1:
+                    print(e1)
+            except AttributeError:
+                return ""
+
+        def p_parse_errors(x):
+            try:
+                return parser.parse_p_posedit(x)
+            except hgvs.exceptions.HGVSParseError as e:
+                reg = r'^(?:[A-z][a-z]{2}){2,}\d+(?:[A-Z][a-z]{2}){2,}$'
+                if re.match(reg, x):
+                    start_AA = x[:3]
+                    end_AA = re.split(r'\d+', x)[0][-3:]
+                    start_pos = re.search(r'\d+', x).group(0)
+                    end_pos = str(int(start_pos)-1+int(len(re.split(r'\d+', x)[0])/3))
+                    alt_AA = re.split(r'\d+', x)[1]
+                    p_pos = parser.parse_p_posedit(start_AA+start_pos+"_"+end_AA+end_pos+"delins"+alt_AA)
+                    return(p_pos)
+                else:
+                    print(e)
+            except TypeError:
+                return [""]*3
+            if type(p_pos.edit) is hgvs.edit.AASub:
+                return(pandas.Series([p_pos.pos.start.base, p_pos.pos.start.aa, p_pos.edit.alt]))
+            else:
+                return(pandas.Series([""]*3))                   
         snpEff = pandas.read_csv(input["formated"], sep="\t", header=0)
-        regexp_simple_change={
-            "missense":{
-                'reg': r'p\.[A-Z][a-z]{2}\d+[A-Z][a-z]{2}',
-                "sep": "\d+"
-            },
-            "silent":{
-                'reg': r'p\.[A-Z][a-z]{2}\d+[A-Z][a-z]{2}',
-                "sep": "\d+"
-            },
-            "start_lost":{
-                'reg': r'^p\.[A-Z][a-z]{2}1\?$',
-                "sep": "1"
-            },
-            "initiator_codon_variant":{
-                "reg": r'^p\.[A-Z][a-z]{2}1\?$',
-                "sep": "1"
-            },
-            "start_retained":{
-                "reg": r'^p\.[A-Z][a-z]{2}1[A-Z][a-z]{2}$',
-                "sep":"1"
-             },
-            "stop_lost":{
-                'reg':r'^p\.Ter\d+(?:[A-Z][a-z]{2}ext\*\?|fs)$',
-                "sep":"\d+"
-            },
-            "stop_gained":{
-                'reg': r'p\.[A-Z][a-z]{2}\d+\*',
-                "sep":"\d+"
-            },
-            "stop_retained":{
-                "reg": r'^p\.Ter\d+Ter$',
-                "sep": "\d+"
-            }
-        }
-        regexp_frameshift_single_deletion_duplication={
-            "frameshift":{
-                "reg": r'^p\.[A-z][a-z]{2}\d+fs$',
-                "sep": "\d+"
-            },
-            "deletion":{
-                "reg": r'^p\.[A-z][a-z]{2}\d+del$',
-                "sep": "\d+"
-            },
-            "duplication":{
-                "reg": r'^p\.[A-z][a-z]{2}\d+dup$',
-                "sep": "\d+"
-            }
-        }
-        regexp_multi_deletion_duplication ={
-            "deletion":{
-                "reg": r'^p\.[A-z][a-z]{2}\d+_[A-z][a-z]{2}\d+del$',
-                "sep": "_"
-            },
-            "duplication":{
-                "reg": r'^p\.[A-z][a-z]{2}\d+_[A-z][a-z]{2}\d+dup$',
-                "sep": "_"
-            },
-        }
-        regexp_insertion_multi_delins={
-            "insertion":
-            {
-                "reg": r'^p\.[A-z][a-z]{2}\d+_[A-z][a-z]{2}\d+ins(?:[A-Z][a-z]{2})+$',
-                "sep": "_"
-            },
-            "deletion_insertion":{
-                "reg": r'^p\.[A-z][a-z]{2}\d+_[A-z][a-z]{2}\d+delins(?:[A-Z][a-z]{2})+$',
-                "sep": "_"
-            }
-        }
-        regexp_single_delins={
-            "deletion_insertion":
-            {
-                "reg": r'^p\.[A-z][a-z]{2}\d+delins(?:[A-Z][a-z]{2})+$',
-                "sep": "_"
-            }
-        }
-        regexp_incorrect_multi_delins={
-            "deletion_insertion":
-            {
-                "reg": r'^p\.(?:[A-z][a-z]{2}){2,}\d+(?:[A-Z][a-z]{2}){2,}$',
-                "sep": "\d+"
-            }
-        }
-        final = pandas.DataFrame([])
-        for annotation, values in regexp_simple_change.items():
-            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
-            if not tmp.empty:
-                tmp[["start_AA", "alt_AA"]] = tmp["HGVS.p"].str.replace("^p\.", "").str.split(pat=values["sep"], expand=True)
-                tmp["start_pos"] = tmp["Protein_len"].str.split("/", expand=True)[0]
-                if annotation=="missense":
-                    tmp = tmp.loc[(tmp["start_AA"]!=tmp["alt_AA"]) & (tmp["start_pos"]!=1) & (tmp["start_AA"]!="Ter")]
-                elif annotation=="silent":
-                    tmp = tmp.loc[(tmp["start_AA"]==tmp["alt_AA"]) & (tmp["start_pos"]!=1) & (tmp["start_AA"]!="Ter")]
-                elif annotation=="start_lost":
-                    tmp = tmp.loc[(tmp["Annotation"]!="initiator_codon_variant")]
-                elif annotation=="initiator_codon_variant":
-                    tmp = tmp.loc[(tmp["Annotation"]!="start_lost")]
-                tmp["type"] = annotation
-                tmp["end_pos"] = tmp["start_pos"]
-                tmp["insertion_length"] = 0
-                tmp["end_AA"] = tmp["start_AA"]
-                final = pandas.concat([final, tmp])
-        for annotation, values in regexp_frameshift_single_deletion_duplication.items():
-            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
-            if not tmp.empty:
-                tmp["start_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.split(pat=values["sep"], expand=True)[0]
-                tmp["start_pos"] = tmp["Protein_len"].str.split("/", expand=True)[0]
-                tmp = tmp.loc[tmp["start_AA"]!="Ter"]
-                tmp["type"] = annotation
-                tmp["end_pos"] = tmp["start_pos"]
-                tmp["alt_AA"] = ""
-                tmp["insertion_length"] = 0
-                tmp["end_AA"] = tmp["start_AA"]
-                final = pandas.concat([final, tmp])
-        for annotation, values in regexp_multi_deletion_duplication.items():
-            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
-            if not tmp.empty:
-                tmp["type"] = annotation
-                tmp["start_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del", "").str.replace("dup", "").str.split(pat=values["sep"], expand=True)[0].str[:3]
-                tmp["start_pos"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del", "").str.replace("dup", "").str.split(pat=values["sep"], expand=True)[0].str[3:]
-                tmp["end_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del", "").str.replace("dup", "").str.split(pat=values["sep"], expand=True)[1].str[:3]
-                tmp["end_pos"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del", "").str.replace("dup", "").str.split(pat=values["sep"], expand=True)[1].str[3:]
-                tmp["alt_AA"] = ""
-                tmp["insertion_length"] = 0
-                final = pandas.concat([final, tmp])
-        for annotation, values in regexp_insertion_multi_delins.items():
-            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
-            if not tmp.empty:
-                tmp["type"] = annotation
-                tmp["start_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("ins", "").str.replace("del", "").str.split(pat=values["sep"], expand=True)[0].str[:3]
-                tmp["start_pos"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del", "").str.replace("ins", "").str.split(pat=values["sep"], expand=True)[0].str[3:]
-                tmp["end_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del.*", "").str.replace("ins.*", "").str.split(pat=values["sep"], expand=True)[1].str[:3]
-                tmp["end_pos"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("del.*", "").str.replace("ins.*", "").str.split(pat=values["sep"], expand=True)[1].str[3:]
-                tmp["alt_AA"] = tmp["HGVS.p"].str.split("ins", expand=True)[1]
-                tmp["insertion_length"] = tmp["alt_AA"].str.len().divide(3)
-                final = pandas.concat([final, tmp])
-        for annotation, values in regexp_single_delins.items():
-            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
-            if not tmp.empty:
-                tmp["type"] = annotation
-                tmp["start_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("delins", "").str.split(pat=values["sep"], expand=True)[0].str[:3]
-                tmp["start_pos"] = tmp["HGVS.p"].str.replace("^p\.", "").str.replace("delins.*", "").str.split(pat=values["sep"], expand=True)[0].str[3:]
-                tmp["alt_AA"] = tmp["HGVS.p"].str.split("ins", expand=True)[1]
-                tmp["insertion_length"] = tmp["alt_AA"].str.len().divide(3)
-                tmp["end_pos"] = tmp["start_pos"]
-                tmp["end_AA"] = tmp["start_AA"]
-                final = pandas.concat([final, tmp])
-        for annotation, values in regexp_incorrect_multi_delins.items():
-            print(sum(snpEff["HGVS.p"].str.match(values["reg"], na=False)))
-            tmp = snpEff.loc[snpEff["HGVS.p"].str.match(values["reg"], na=False)]
-            if not tmp.empty:
-                print(tmp)
-                tmp["type"] = annotation
-                tmp["start_AA"] = tmp["HGVS.p"].str.replace("^p\.", "").str.split(pat=values["sep"], expand=True)[0].str[:3]
-                tmp["start_pos"] = tmp["HGVS.p"].str.extract("("+values["sep"]+")").astype(int)
-                tmp["alt_AA"] = tmp["HGVS.p"].str.split(pat=values["sep"], expand=True)[1]
-                tmp["insertion_length"] = tmp["alt_AA"].str.len().divide(3)
-                tmp["end_pos"] = tmp["start_pos"]-1+tmp["HGVS.p"].str.replace("p\.", "").str.split(pat=values["sep"], expand=True)[0].str.len().divide(3)
-                tmp["end_AA"] = tmp["HGVS.p"].str.replace("p\.", "").str.split(pat=values["sep"], expand=True)[0].str[-3:]
-                print(tmp)
-                final = pandas.concat([final, tmp])
-        final["alt_AA"] = final["alt_AA"].str.replace("*", "Ter").str.replace("extTer\?", "")
-        print(sum(final["type"].value_counts()))
-        print(final["type"].value_counts())
-        final.to_csv(output["substitution"], sep="\t", header=True, index=False)
+        parser = hgvs.parser.Parser()
+        snpEff = snpEff[~snpEff["Annotation"].isin(["intergenic_region", "downstream_gene_variant", "non_coding_transcript_variant", "intragenic_variant"])]
+        final_annotation = []
+        for index, row in snpEff.iterrows():
+            gene_id = row["Feature_ID"].replace("TRANSCRIPT_", "").replace("gene-", "").replace("rna-", "")
+            if row["Annotation"] == "non_coding_transcript_exon_variant":
+                tmp = n_parse_error(row["HGVS.c"])
+                pos = tmp.pos.start.base
+                posend = ""
+                if tmp.pos.start != tmp.pos.end:
+                    posend = tmp.pos.end.base
+                try:
+                    alt = tmp.edit.alt
+                except AttributeError:
+                    alt = ""
+                t = tmp.edit.type
+                final_annotation.append([gene_id, row["Annotation"], pos, row["HGVS.c"]])
+            elif row["Annotation"] == "synonymous_variant" and len(row["Ref"])>1:
+                pass
+            elif row["Annotation"] != "upstream_gene_variant":
+                tmp = p_parse_errors(row["HGVS.p"].replace("p.", ""))
+                if str(tmp.edit.type) == "delins" and row["Annotation"]=="missense_variant":
+                    final_annotation.append([gene_id, row["Annotation"], row["Dist_to_feat"], str(tmp)])
+                else:
+                    final_annotation.append([gene_id, row["Annotation"], row["Dist_to_feat"], row["HGVS.p"]])
+            elif row["Annotation"] == "upstream_gene_variant":
+                if row["Transcript_biotype"]!="pseudogene":
+                    final_annotation.append(list(row[["Chrom", "Pos", "Ref", "Alt"]]) + [gene_id, row["Annotation"], -row["Dist_to_feat"], row["HGVS.c"]])
+        pandas.DataFrame(final_annotation).to_csv(output["substitution"], index=False, sep="\t")
 
 
- 
-
-        
-        
-#        re_missense = r'p\.[A-Z][a-z]{2}\d+[A-Z][a-z]{2}'
-#        re_stop = r'p\.[A-Z][a-z]{2}\d+\*'
-#        re_start_lost = r'p\.[A-Z][a-z]{2}1\?'
-#        re_stop_lost =  r'p\.Ter\d+[A-Z][a-z]{2}ext\?*'
-#        missense = snpEff.loc[snpEff["Annotation"]=="missense_variant"]
-#        missense = missense.loc[missense["HGVS.p"].str.match(re_missense)]
-#        missense[["referenceAA", "mutatedAA"]] = missense["HGVS.p"].str.replace("^p\.", "").str.split(pat="\d+", expand=True)#
-
-#        stop_gained = snpEff.loc[snpEff["Annotation"]=="stop_gained"]
- #       stop_gained = stop_gained.loc[stop_gained["HGVS.p"].str.match(re_stop)]
-  #      stop_gained[["referenceAA", "mutatedAA"]] = stop_gained["HGVS.p"].str.replace("^p\.", "").str.split(pat="\d+", expand=True)
-   #     stop_gained[["position", "total_length"]] = stop_gained["Protein_len"].str.split("/", expand=True)
-    #    stop_gained["mutatedAA"] = "Ter"
-     #   start_lost = snpEff.loc[snpEff["Annotation"]=="start_lost"]
-      #  start_lost = start_lost.loc[start_lost["HGVS.p"].str.match(re_start_lost)]
-       # start_lost[["referenceAA", "mutatedAA"]] = start_lost["HGVS.p"].str.replace("^p\.", "").str.split(pat="1", expand=True)
-     #   start_lost[["position", "total_length"]] = start_lost["Protein_len"].str.split("/", expand=True)
-     #   missense[["Chrom", "Pos", "Ref", "Alt", "Gene_Name", "position", "referenceAA", "mutatedAA"]].to_csv(output["substitution"], sep="\t", header=True, index=False)
-      #  stop_gained[["Chrom", "Pos", "Ref", "Alt", "Gene_Name", "position", "referenceAA", "mutatedAA"]].to_csv(output["substitution"], sep="\t", header=False, index=False, mode="a")
-      #  start_lost[["Chrom", "Pos", "Ref", "Alt", "Gene_Name", "position", "referenceAA", "mutatedAA"]].to_csv(output["substitution"], sep="\t", header=False, index=False, mode="a")
-        
-        #        re_stop = r'p\.[A-Z][a-z]{2}\d+\*'
-#        re_stop_lost = r'p\.Ter\d+[A-Z][a-z]{2}ext\?*'
-#        re_frameshift = r'p\.[A-Z][a-z]{2}\d+fs'
-#        re_start_lost = r'p\.Met1\?'
-#        missense = snpEff.loc[snpEff["HGVS.p"].str.match(re_missense)]
-#        stop = snpEff.loc[snpEff["HGVS.p"].str.match(re_stop)]
-#        frameshift = snpEff.loc[snpEff["HGVS.p"].str.match(re_frameshift)]
-#        missense[["referenceAA", "mutatedAA"]] = missense["HGVS.p"].str.replace("^p\.", "").str.split(pat="\d+", expand=True)
-#        missense[["position", "total_length"]] = missense["Protein_len"].str.split("/", expand=True)
-#        missense[["Feature_ID", "position", "referenceAA", "mutatedAA"]].to_csv(output["formated"], sep="\t", header=False, index=True)
-
-#        substitution = snpEff.loc[snpEff["annotation"].isin(["missense_variant", "stop_gained", "start_lost", "stop_retained_variant", "stop_lost"])]
-#        substitution[["Chrom", "Pos", "Ref", "Alt", .to_csv
                                   
