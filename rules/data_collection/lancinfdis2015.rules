@@ -1,111 +1,48 @@
-rule convert_xlsx_to_csv:
-    input:
-        xlsx = "lancinfdis2015/raw_data.xlsx"
-    output:
-        csv = "lancinfdis2015/raw_data.csv",
-    run:
-        import pandas, openpyxl
-        walker = pandas.read_excel(input["xlsx"], skiprows=2)
-        walker[["Isolate accession number", "Isoniazid", "Rifampicin", "Ethambutol", "Pyrazinamide", "Streptomycin", "Ciprofloxacin", "Moxifloxacin", "Ofloxacin", "Amikacin", "Capreomycin", "Kanamycin"]].to_csv(output["csv"], sep="\t", header=True, index=False)
-
-
-rule get_sras_from_biosamples:
-    input:
-        csv = "lancinfdis2015/raw_data.csv",
-    output:
-        sras = "lancinfdis2015/sra.csv",
-    run:
-        import pandas, urllib.request, xml.etree.ElemenTree as ET
-        phenotypes = pandas.read_csv(input["rawdata"], sep="\t", header=0)
-        BioSamples_to_be_resolved = []
-        for index, row in phenotypes.iterrows():
-            if row["Isolate accession number"].startswith("SAMN") or row["Isolate accession number"].startswith("ERS"):
-                entries = row["Isolate accession number"].split(",")
-                BioSamples_to_be_resolved.extend(entries)
-        base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-        sra = {}
-        for entries in [BioSamples_to_be_resolved[i::20] for i in range(20)]:
-            url = base + "efetch.fcgi?db=biosample&id=" + ",".join(entries)
-            with urllib.request.urlopen(url) as response:
-                xml = ET.fromstring(response.read())
-                for package in xml:
-                    print(package.find("BioSampleSet").find("BioSample").find("Ids"))
-        pandas.DataFrame.from_dict(biosamples, orient="index").reset_index().to_csv(output["biosamples"], sep="\t", index=False, header=False)
-        """
-        for query in $(tail -n +2 {input[csv]} | cut -f1 | grep -v "ERR" | grep -v "SRR" | grep -v "DRR" | sort | uniq)
-        do
-            SRA=$(esearch -db sra -query "$query" | efetch -format docsum | xtract -pattern DocumentSummary -element Run@acc)
-            for sra in $SRA
-            do
-               echo $query $sra >> {output[sras]}
-            done
-        done
-        """
-
-
-rule get_biosamples_for_sras:
-    input:
-        rawdata = "lancinfdis2015/raw_data.csv",
-    output:
-        biosamples = "lancinfdis2015/biosample.csv",
-    run:
-        import pandas, urllib.request, xml.etree.ElementTree as ET
-        phenotypes = pandas.read_csv(input["rawdata"], sep="\t", header=0)
-        SRAs_to_be_resolved = []
-        for index, row in phenotypes.iterrows():
-            if row["Isolate accession number"].startswith("ERR") or row["Isolate accession number"].startswith("SRR") or row["Isolate accession number"].startswith("DRR"):
-                entries = row["Isolate accession number"].split(",")
-                SRAs_to_be_resolved.extend(entries)
-        base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-        biosamples = {}
-        for entries in [SRAs_to_be_resolved[i::20] for i in range(20)]:
-            url = base + "efetch.fcgi?db=sra&id=" + ",".join(entries)
-            with urllib.request.urlopen(url) as response:
-                xml = ET.fromstring(response.read())
-                for package in xml:
-                    biosamples[package.find("RUN_SET").find("RUN").get("accession")] = package.find("SAMPLE").get("alias")
-        pandas.DataFrame.from_dict(biosamples, orient="index").reset_index().to_csv(output["biosamples"], sep="\t", index=False, header=False)
-        
-        
 rule load_lancinfdis:
     params:
         host = config["db_host"],
         user = config["db_user"],
         db = config["db_name"],
     input:
-        libraries = "walker/libraries.csv",
-        rawdata = "walker/raw_data.csv",
-        biosample = "walker/biosample.csv",
+        rawdata = "lancinfdis2015/raw_data.xlsx"
     run:
         import pandas, psycopg2, urllib.request, xml.etree.ElementTree as ET
-        phenotypes = pandas.read_csv(input["rawdata"], sep="\t", header=0)
-        biosamples = pandas.read_csv(input["biosample"], sep="\t", header=None, index_col=0, names=["Run", "BioSample"])
-        libraries = pandas.read_csv(input["libraries"], sep=" ", header=None, index_col=0, names=["BioSample", "Run"])
+        phenotypes = pandas.read_excel(input["rawdata"], skiprows=2)[["Isolate accession number", "Isoniazid", "Rifampicin", "Ethambutol", "Pyrazinamide", "Streptomycin", "Ciprofloxacin", "Moxifloxacin", "Ofloxacin", "Amikacin", "Capreomycin", "Kanamycin"]]
         conn = psycopg2.connect(host=params["host"],database=params["db"], user=params["user"])
         curr = conn.cursor()
         statement = 'SELECT "Name", "Id" FROM "Drug";'
         curr.execute(statement)
         drugs = {x[0]:x[1] for x in curr.fetchall()}
         prefix = "LancInfDis2015_"
-        statement = 'SELECT "Name", "Id" FROM "Specimen" WHERE "Name" LIKE ' + "'" + prefix + "%';"
-        curr.execute(statement)
-        specimen = {x[0]:x[1] for x in curr.fetchall()}
+        base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         for index, row in phenotypes.iterrows():
-            sample_name = row["Isolate accession number"]
-            if sample_name.startswith("SRR") or sample_name.startswith("ERR") or sample_name.startswith("DRR"):
-                sample_name = biosamples.loc[row["Isolate accession number"].split(",")[0].strip()]["BioSample"]
-                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) RETURNING "Id";', [prefix+sample_name])
-                specimen[prefix+sample_name] = curr.fetchone()[0]
-                for library in row["Isolate accession number"].split(","):
-                    curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', (specimen[prefix+sample_name], library.strip()))
+            if row["Isolate accession number"].startswith("ERS"):
+                sras = [] 
+                for SRA_UID in [x.text for x in ET.fromstring(urllib.request.urlopen(base + "esearch.fcgi?db=sra&term=" + row["Isolate accession number"]).read()).find("IdList").findall("Id")]:
+                    xml = ET.fromstring(urllib.request.urlopen(base + "efetch.fcgi?db=sra&id=" + SRA_UID).read())
+                    sras.append(xml.find("EXPERIMENT_PACKAGE").find("RUN_SET").find("RUN").get("accession"))
+                    sample_name = xml.find("EXPERIMENT_PACKAGE").find("SAMPLE").get("alias")
+                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) returning "Id";', [prefix+sample_name])
+                specimen_id = curr.fetchone()[0]
+                for sra in sras:
+                    curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', (specimen_id, sra))
+            elif row["Isolate accession number"].startswith("SAM"):
+                sample_name = row["Isolate accession number"]
+                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) returning "Id";', [prefix+sample_name])
+                specimen_id = curr.fetchone()[0]
+                xml = ET.fromstring(urllib.request.urlopen(base + "esearch.fcgi?db=sra&term=" + row["Isolate accession number"]).read())
+                for SRA_UID in [x.text for x in xml.find("IdList").findall("Id")]:
+                    SRA_accession = ET.fromstring(urllib.request.urlopen(base + "efetch.fcgi?db=sra&id=" + SRA_UID).read()).find("EXPERIMENT_PACKAGE").find("RUN_SET").find("RUN").get("accession")
+                    curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', (specimen_id, SRA_accession))
             else:
-                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) RETURNING "Id";', [prefix+sample_name])
-                specimen[prefix+sample_name] = curr.fetchone()[0]
-                for lib in list(libraries.loc[[sample_name]]["Run"]):
-                    curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', (specimen[prefix+sample_name], lib))
+                sample_name = ET.fromstring(urllib.request.urlopen(base + "efetch.fcgi?db=sra&id=" + row["Isolate accession number"].split(",")[0]).read()).find("EXPERIMENT_PACKAGE").find("SAMPLE").get("alias")
+                curr.execute('INSERT INTO "Specimen" ("Name") VALUES (%s) returning "Id";', [prefix+sample_name])
+                specimen_id = curr.fetchone()[0]
+                for lib in row["Isolate accession number"].split(","):
+                    curr.execute('INSERT INTO "Library" ("PreparedFrom", "Name") VALUES (%s, %s);', (specimen_id, lib))
             for drug in drugs.keys():
                 if row.get(drug, "") == "R" or row.get(drug, "") == "S":
-                    curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "DrugId", "Result") VALUES (%s, %s, %s);', (specimen[prefix+sample_name], drugs[drug], row[drug]))
+                    curr.execute('INSERT INTO "PhenotypicDrugSusceptibilityTest" ("SpecimenId", "DrugId", "Result") VALUES (%s, %s, %s);', (specimen_id, drugs[drug], row[drug]))
         conn.commit()            
         
 
