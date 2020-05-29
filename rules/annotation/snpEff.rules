@@ -254,19 +254,20 @@ rule extract_annotation_for_protein_change:
                 except AttributeError:
                     alt = ""
                 t = tmp.edit.type
-                final_annotation.append([gene_id, row["Annotation"], pos, row["HGVS.c"]])
+                final_annotation.append(list(row[["Chrom", "Pos", "Ref", "Alt"]])  + [gene_id, row["Annotation"], pos, row["HGVS.c"]])
             elif row["Annotation"] == "synonymous_variant" and len(row["Ref"])>1:
                 pass
             elif row["Annotation"] != "upstream_gene_variant":
                 tmp = p_parse_errors(row["HGVS.p"].replace("p.", ""))
+                pos = tmp.pos.start.base
                 if str(tmp.edit.type) == "delins" and row["Annotation"]=="missense_variant":
-                    final_annotation.append([gene_id, row["Annotation"], row["Dist_to_feat"], str(tmp)])
+                    final_annotation.append(list(row[["Chrom", "Pos", "Ref", "Alt"]]) + [gene_id, row["Annotation"], pos, str(tmp)])
                 else:
-                    final_annotation.append([gene_id, row["Annotation"], row["Dist_to_feat"], row["HGVS.p"]])
+                    final_annotation.append(list(row[["Chrom", "Pos", "Ref", "Alt"]]) + [gene_id, row["Annotation"], pos, row["HGVS.p"]])
             elif row["Annotation"] == "upstream_gene_variant":
                 if row["Transcript_biotype"]!="pseudogene":
                     final_annotation.append(list(row[["Chrom", "Pos", "Ref", "Alt"]]) + [gene_id, row["Annotation"], -row["Dist_to_feat"], row["HGVS.c"]])
-        pandas.DataFrame(final_annotation).to_csv(output["substitution"], index=False, sep="\t")
+        pandas.DataFrame(final_annotation).to_csv(output["substitution"], index=False, sep="\t", header=["Chrom", "Pos", "Ref", "Alt", "GeneId", "Type", "Dist", "snpEffHGVS"])
 
 
         
